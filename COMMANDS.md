@@ -1,53 +1,51 @@
 # 🚀 Commands Reference Guide — Candidate Screening Agent
 
-This document lists all commands to run, test, and manage the Candidate Screening Agent on Windows.
+This document lists all commands to run, test, and manage the Candidate Screening Agent on **Windows** and **macOS / Linux**.
 
 ---
 
 ## 📦 First-Time Setup on a New Machine
 
-### Option A: One-Click Automated Setup (Windows)
+### 🪟 Windows Setup (One-Click)
 Double-click:
 ```cmd
 setup_new_machine.bat
 ```
-This automatically:
-1. Verifies Python 3.10+ and Node.js 18+
-2. Creates the Python virtual environment (`backend\venv`)
-3. Installs all Python backend dependencies (`requirements.txt`)
-4. Installs Playwright Chromium browser binaries
-5. Installs Frontend dependencies (`npm install`)
-6. Creates `.env` from template if not present
 
-### Option B: Manual Setup (Terminal)
-```powershell
-# 1. Setup Backend
-python -m venv backend/venv
-backend\venv\Scripts\activate
-pip install -r backend/requirements.txt
-python -m playwright install chromium
-
-# 2. Setup Frontend
-cd frontend
-npm install
-cd ..
-
-# 3. Setup Configuration
-copy .env.example .env
+### 🍎 macOS / Linux Setup (One-Click)
+Open Terminal, navigate to the folder, and run:
+```bash
+chmod +x setup_new_machine.sh start_agent.sh run_tests.sh
+./setup_new_machine.sh
 ```
+
+Both setup scripts automatically:
+1. Verify Python 3.10+ and Node.js 18+
+2. Create the Python virtual environment (`backend/venv`)
+3. Install all Python backend dependencies (`requirements.txt`)
+4. Install Playwright Chromium browser binaries
+5. Install Frontend dependencies (`npm install`)
+6. Ensure `.env` is ready with all credentials
 
 ---
 
 ## ⚡ Starting the Agent
 
-### Option 1: One-Click Startup (Easiest)
+### 🪟 Windows (One-Click)
 Double-click:
 ```cmd
 start_agent.bat
 ```
-This automatically starts:
+
+### 🍎 macOS / Linux (Terminal)
+Run:
+```bash
+./start_agent.sh
+```
+This automatically boots:
 1. **Backend:** FastAPI server on `http://127.0.0.1:8000`
 2. **Frontend:** Vite React Dashboard on `http://127.0.0.1:5173`
+3. Automatically opens your default browser to `http://localhost:5173` (press `Ctrl+C` to stop both services gracefully).
 
 ---
 
