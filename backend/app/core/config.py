@@ -80,7 +80,7 @@ class Settings(BaseSettings):
         description="Whether to run the Playwright browser without visible window",
     )
     MAX_CANDIDATES_PER_RUN: int = Field(
-        default=500,
+        default=1000,
         description="Maximum candidates to inspect per screening run",
     )
     API_REQUEST_TIMEOUT_SECONDS: int = Field(
