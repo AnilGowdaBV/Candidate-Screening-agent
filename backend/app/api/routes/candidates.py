@@ -16,22 +16,38 @@ def list_candidates(
     filter_status: Optional[str] = Query(None, description="Filter by classification status"),
     limit: int = Query(250, ge=1, le=5000),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    technology: str = Query("golang"),
 ):
     """Retrieve paginated and filterable list of candidate records."""
-    repo = CandidateRepository(db)
-    items, total = repo.list_candidates(
-        search_query=search,
-        filter_status=filter_status,
-        limit=limit,
-        offset=offset,
-    )
-    return CandidateListResponse(
-        items=[CandidateRead.model_validate(c) for c in items],
-        total=total,
-        limit=limit,
-        offset=offset,
-    )
+    from app.core.cache import cache_get, cache_put
+    from app.database.session import _canonical_tech, get_db
+
+    tech = _canonical_tech(technology)
+    cache_key = ("candidates", tech, search or "", filter_status or "", limit, offset)
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    db_gen = get_db(technology=tech)
+    db = next(db_gen)
+    try:
+        repo = CandidateRepository(db)
+        items, total = repo.list_candidates(
+            search_query=search,
+            filter_status=filter_status,
+            limit=limit,
+            offset=offset,
+        )
+        result = CandidateListResponse(
+            items=[CandidateRead.model_validate(c) for c in items],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
+    finally:
+        db_gen.close()
+    cache_put(cache_key, result)
+    return result
 
 
 @router.get("/{candidate_id}", response_model=CandidateRead)

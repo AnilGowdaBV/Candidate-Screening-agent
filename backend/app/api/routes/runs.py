@@ -33,7 +33,12 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
 def get_technology_counts():
     """Return candidate totals for every technology in one database connection."""
     from sqlalchemy import text
+    from app.core.cache import cache_get, cache_put
     from app.database.session import TECHNOLOGY_DB_MAP, _uses_postgres, get_engine_for_tech
+
+    cached = cache_get("technology-counts")
+    if cached is not None:
+        return cached
 
     counts = {}
     techs = [tech for tech in TECHNOLOGY_DB_MAP if tech != "qa"]
@@ -46,21 +51,38 @@ def get_technology_counts():
                 counts[tech] = conn.execute(
                     text(f'SELECT COUNT(*) FROM "{tech}".candidates')
                 ).scalar() or 0
+        cache_put("technology-counts", counts)
         return counts
 
     for tech in techs:
         engine = get_engine_for_tech(tech)
         with engine.connect() as conn:
             counts[tech] = conn.execute(text("SELECT COUNT(*) FROM candidates")).scalar() or 0
+    cache_put("technology-counts", counts)
     return counts
 
 
 @router.get("/metrics", response_model=DashboardMetrics)
-def get_metrics(run_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
+def get_metrics(run_id: Optional[int] = Query(None), technology: str = Query("golang")):
     """Retrieve real-time metrics computed directly from database records."""
-    repo = ScreeningRepository(db)
-    metrics_data = repo.get_dashboard_metrics(run_id=run_id)
-    return DashboardMetrics.model_validate(metrics_data)
+    from app.core.cache import cache_get, cache_put
+    from app.database.session import _canonical_tech
+
+    tech = _canonical_tech(technology)
+    cache_key = ("metrics", tech, run_id)
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    db_gen = get_db(technology=tech)
+    db = next(db_gen)
+    try:
+        metrics_data = ScreeningRepository(db).get_dashboard_metrics(run_id=run_id)
+        result = DashboardMetrics.model_validate(metrics_data)
+    finally:
+        db_gen.close()
+    cache_put(cache_key, result)
+    return result
 
 
 # Lifecycle Actions

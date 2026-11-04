@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { TechnologyCards } from './components/TechnologyCards';
 import { ControlPanel } from './components/ControlPanel';
@@ -58,6 +58,8 @@ export const App: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState('');
   const [pageSize, setPageSize] = useState<number>(500);
   const [isLoading, setIsLoading] = useState(false);
+  const metricsCache = useRef<Partial<Record<TechnologyKey, DashboardMetrics>>>({});
+  const candidateCache = useRef<Partial<Record<TechnologyKey, { items: Candidate[]; total: number }>>>({});
 
   // Fetch counts for all technologies to display on top cards
   const refreshAllCounts = useCallback(async () => {
@@ -78,6 +80,7 @@ export const App: React.FC = () => {
         fetchEvents(100, undefined, selectedTechnology),
       ]);
       setStatus(statusData);
+      metricsCache.current[selectedTechnology] = metricsData;
       setMetrics(metricsData);
       setEvents(eventsData);
     } catch (err) {
@@ -89,6 +92,7 @@ export const App: React.FC = () => {
   const refreshCandidates = useCallback(async () => {
     try {
       const data = await fetchCandidates(search, activeFilter, pageSize, 0, selectedTechnology);
+      candidateCache.current[selectedTechnology] = { items: data.items, total: data.total };
       setCandidates(data.items);
       setCandidateTotal(data.total);
     } catch (err) {
@@ -103,6 +107,16 @@ export const App: React.FC = () => {
       setRuns(data);
     } catch (err) {
       console.error('Failed to refresh runs:', err);
+    }
+  }, [selectedTechnology]);
+
+  useEffect(() => {
+    const cachedMetrics = metricsCache.current[selectedTechnology];
+    if (cachedMetrics) setMetrics(cachedMetrics);
+    const cachedCandidates = candidateCache.current[selectedTechnology];
+    if (cachedCandidates) {
+      setCandidates(cachedCandidates.items);
+      setCandidateTotal(cachedCandidates.total);
     }
   }, [selectedTechnology]);
 
