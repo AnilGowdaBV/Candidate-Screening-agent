@@ -75,7 +75,7 @@ export const App: React.FC = () => {
       const [statusData, metricsData, eventsData] = await Promise.all([
         fetchStatus(),
         fetchMetrics(selectedTechnology),
-        fetchEvents(100),
+        fetchEvents(100, undefined, selectedTechnology),
       ]);
       setStatus(statusData);
       setMetrics(metricsData);

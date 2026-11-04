@@ -29,8 +29,8 @@ export async function fetchMetrics(technology = 'golang', runId?: number): Promi
   return res.json();
 }
 
-export async function fetchEvents(limit = 50, runId?: number): Promise<ActivityEvent[]> {
-  const params = new URLSearchParams({ limit: limit.toString() });
+export async function fetchEvents(limit = 50, runId?: number, technology = 'golang'): Promise<ActivityEvent[]> {
+  const params = new URLSearchParams({ limit: limit.toString(), technology });
   if (runId) params.append('run_id', runId.toString());
   const res = await fetch(`${API_BASE}/events?${params.toString()}`);
   if (!res.ok) throw new Error(`Events error: ${res.statusText}`);

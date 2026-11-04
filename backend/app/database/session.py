@@ -108,9 +108,13 @@ from fastapi import Query
 
 def get_db(technology: str = Query("golang")) -> Generator[Session, None, None]:
     """Dependency that yields an active database session for the specified technology."""
-    sm = get_sessionmaker_for_tech(technology)
-    db = sm()
+    from sqlalchemy import text
+
+    tech = _canonical_tech(technology)
+    db = get_sessionmaker_for_tech(tech)()
     try:
+        if _uses_postgres():
+            db.execute(text(f'SET search_path TO "{tech}"'))
         yield db
     finally:
         db.close()
