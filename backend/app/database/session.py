@@ -64,7 +64,16 @@ def get_engine_for_tech(technology: str = "golang") -> Engine:
         if _uses_postgres():
             from sqlalchemy import text
 
-            admin = create_engine(settings.DATABASE_URL, pool_pre_ping=True, echo=False)
+            if "postgres" not in _engines:
+                _engines["postgres"] = create_engine(
+                    settings.DATABASE_URL,
+                    pool_pre_ping=True,
+                    pool_size=1,
+                    max_overflow=0,
+                    echo=False,
+                    connect_args={"prepare_threshold": None},
+                )
+            admin = _engines["postgres"]
             with admin.begin() as conn:
                 conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{tech}"'))
             eng = admin.execution_options(schema_translate_map={None: tech})
