@@ -148,7 +148,7 @@ export const App: React.FC = () => {
       refreshCore();
       refreshCandidates();
       refreshAllCounts();
-    }, 4000);
+    }, 20000);
     return () => clearInterval(timer);
   }, [refreshCore, refreshCandidates, refreshAllCounts]);
 

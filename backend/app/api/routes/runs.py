@@ -38,8 +38,10 @@ def get_technology_counts():
     counts = {}
     techs = [tech for tech in TECHNOLOGY_DB_MAP if tech != "qa"]
     if _uses_postgres():
+        from app.database.session import postgres_lock
+
         engine = get_engine_for_tech("golang")
-        with engine.connect() as conn:
+        with postgres_lock, engine.connect() as conn:
             for tech in techs:
                 counts[tech] = conn.execute(
                     text(f'SELECT COUNT(*) FROM "{tech}".candidates')

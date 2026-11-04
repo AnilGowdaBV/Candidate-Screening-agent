@@ -1,6 +1,7 @@
 """Database engine and session factory. MySQL for the app, SQLite for local tests."""
 
 from pathlib import Path
+import threading
 from typing import Generator
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import NullPool
@@ -27,6 +28,7 @@ TECHNOLOGY_DB_MAP = {
 }
 
 settings = get_settings()
+postgres_lock = threading.Lock()
 # Resolve project root data directory
 project_root = Path(__file__).resolve().parents[3]  # backend/app/database/session.py -> 3 parents is root
 base_dir = project_root / "data"
@@ -111,13 +113,18 @@ def get_db(technology: str = Query("golang")) -> Generator[Session, None, None]:
     from sqlalchemy import text
 
     tech = _canonical_tech(technology)
+    locked = _uses_postgres()
+    if locked:
+        postgres_lock.acquire()
     db = get_sessionmaker_for_tech(tech)()
     try:
-        if _uses_postgres():
+        if locked:
             db.execute(text(f'SET search_path TO "{tech}"'))
         yield db
     finally:
         db.close()
+        if locked:
+            postgres_lock.release()
 
 
 def _column_names(conn, table: str) -> set[str]:
@@ -176,9 +183,20 @@ def _migrate_columns(eng: Engine) -> None:
 def init_db(technology: str = "golang") -> None:
     """Create all tables if they don't exist for the specified technology or all."""
     import app.models  # Ensures all models are registered with Base.metadata
-    from sqlalchemy import text
 
     techs = list(TECHNOLOGY_DB_MAP) if technology == "all" else [technology]
+    if _uses_postgres():
+        postgres_lock.acquire()
+    try:
+        _init_db_unlocked(techs)
+    finally:
+        if _uses_postgres():
+            postgres_lock.release()
+
+
+def _init_db_unlocked(techs: list[str]) -> None:
+    from sqlalchemy import text
+
     for tech in techs:
         eng = get_engine_for_tech(tech)
         if _uses_postgres():

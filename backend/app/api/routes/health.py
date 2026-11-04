@@ -1,5 +1,6 @@
 """Health and system status routes."""
 
+from contextlib import nullcontext
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app import __version__
@@ -50,7 +51,10 @@ def get_system_status():
         from sqlalchemy import text
         from app.database.session import get_engine_for_tech
 
-        with get_engine_for_tech("golang").connect() as conn:
+        from app.database.session import postgres_lock, _uses_postgres
+
+        lock = postgres_lock if _uses_postgres() else nullcontext()
+        with lock, get_engine_for_tech("golang").connect() as conn:
             conn.execute(text("SELECT 1"))
         db_ready = True
     except Exception:
