@@ -102,12 +102,26 @@ class PlaywrightBrowserManager:
         logger.info("Initializing Playwright with persistent profile at: %s", self.user_data_dir)
 
         self.playwright = await async_playwright().start()
-        self.context = await self.playwright.chromium.launch_persistent_context(
+        launch_kwargs = dict(
             user_data_dir=self.user_data_dir,
             headless=self.headless,
             viewport={"width": 1366, "height": 768},
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
         )
+        last_error = None
+        for channel in ("chrome", "msedge", None):
+            try:
+                kwargs = dict(launch_kwargs)
+                if channel:
+                    kwargs["channel"] = channel
+                self.context = await self.playwright.chromium.launch_persistent_context(**kwargs)
+                logger.info("Browser launched with %s", channel or "bundled Chromium")
+                break
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Browser channel %s failed: %s", channel or "bundled", exc)
+        if self.context is None:
+            raise last_error
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
 
     async def close(self) -> None:
@@ -292,6 +306,9 @@ class PlaywrightBrowserManager:
         seen_ids = set()
 
         for idx, row in enumerate(rows):
+            box = await row.bounding_box()
+            if not box or box.get("height", 0) < 30:
+                continue
             cand_id = await row.get_attribute("id")
             if cand_id and cand_id in seen_ids:
                 continue
@@ -399,12 +416,21 @@ class PlaywrightBrowserManager:
                 "name": name,
                 "external_id": cand_id,
                 "row_index": idx,
+                "sort_y": box["y"],
                 "github_url": card_gh,
                 "current_salary": current_salary,
                 "location": location,
                 "experience": experience,
             })
 
+        candidates.sort(key=lambda c: (c.get("sort_y", 0), c.get("row_index", 0)))
+        for order, cand in enumerate(candidates, start=1):
+            cand["row_index"] = order
+        if candidates:
+            logger.info(
+                "Search order starts with: %s",
+                ", ".join(c["name"] for c in candidates[:5]),
+            )
         logger.info("Discovered %d candidate profiles on search page", len(candidates))
         return candidates
 

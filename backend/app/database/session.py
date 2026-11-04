@@ -156,6 +156,8 @@ def _migrate_columns(eng: Engine) -> None:
             existing_sr_cols = _column_names(conn, "screening_results")
             if existing_sr_cols and "languages_found" not in existing_sr_cols:
                 conn.exec_driver_sql("ALTER TABLE screening_results ADD COLUMN languages_found VARCHAR(200)")
+            if existing_sr_cols and "search_order" not in existing_sr_cols:
+                conn.exec_driver_sql("ALTER TABLE screening_results ADD COLUMN search_order INTEGER")
             for table in ("screening_runs", "screening_results", "note_actions", "activity_events"):
                 cols = _column_names(conn, table)
                 if cols and "technology" not in cols:

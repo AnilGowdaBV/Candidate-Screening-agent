@@ -42,6 +42,7 @@ class ScreeningResult(Base):
     error_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     languages_found: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    search_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # Relationships
     candidate: Mapped["Candidate"] = relationship("Candidate", back_populates="screening_results")

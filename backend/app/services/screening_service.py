@@ -103,6 +103,7 @@ class ScreeningOrchestrator:
 
             # Retrieve candidate list (either synthetic fixtures or Playwright extraction)
             candidate_cards: List[Dict[str, str]] = []
+            seen_page_signatures = set()
 
             if synthetic_candidates is not None:
                 candidate_cards = synthetic_candidates
@@ -140,6 +141,10 @@ class ScreeningOrchestrator:
                     logger.info("Starting candidate discovery at page 1 for search URL.")
 
                     candidate_cards = await self.browser_manager.extract_candidate_cards()
+                    if candidate_cards:
+                        seen_page_signatures.add(
+                            tuple(c.get("external_id") or c.get("url") for c in candidate_cards)
+                        )
                 except Exception as b_err:
                     logger.warning("Browser discovery encountered: %s. Using safe fallback.", b_err)
                     # If browser fails due to auth/display in headless test, record warning
@@ -165,6 +170,11 @@ class ScreeningOrchestrator:
                             candidate_cards = await self.browser_manager.extract_candidate_cards()
                             if not candidate_cards:
                                 break
+                            signature = tuple(c.get("external_id") or c.get("url") for c in candidate_cards)
+                            if signature in seen_page_signatures:
+                                logger.info("Next page repeated the same candidates. Stopping so the run does not loop.")
+                                break
+                            seen_page_signatures.add(signature)
                             await event_broker.emit(
                                 event_type="PAGE_NAVIGATED",
                                 message=f"Advanced to next search page. Found {len(candidate_cards)} candidates.",
@@ -224,14 +234,18 @@ class ScreeningOrchestrator:
 
                 # Skip candidate if already screened previously across any run
                 prior_result = screen_repo.find_latest_screening_result(candidate.id)
-                if prior_result and prior_result.go_status not in ("CHECK_INCOMPLETE", "API_RATE_LIMITED", "API_ERROR"):
-                    logger.info("Candidate %s (#%d) already screened previously (%s). Skipping duplicate profile.", cand_name, candidate.id, prior_result.go_status)
+                if prior_result and prior_result.run_id != run_id and prior_result.go_status not in ("CHECK_INCOMPLETE", "API_RATE_LIMITED", "API_ERROR"):
+                    logger.info(
+                        "Candidate %s (#%d) already screened previously (%s). Skipping duplicate.",
+                        cand_name, candidate.id, prior_result.go_status,
+                    )
                     await event_broker.emit(
                         event_type="CANDIDATE_SKIPPED_DUPLICATE",
                         message=f"{cand_name} was already screened earlier ({prior_result.go_status}). Skipping duplicate.",
                         run_id=run_id,
                         candidate_id=candidate.id,
                     )
+                    idx += 1
                     continue
 
                 await event_broker.emit(
@@ -319,6 +333,7 @@ class ScreeningOrchestrator:
                     error_code=gh_check.error_code,
                     error_message=gh_check.error_message,
                     languages_found=gh_check.languages_found,
+                    search_order=idx + 1,
                 )
                 if gh_check.languages_found:
                     cand_repo.update_languages_found(candidate.id, gh_check.languages_found)
@@ -413,6 +428,8 @@ class ScreeningOrchestrator:
             # Stage 9: Completion
             state_manager.complete_run()
             screen_repo.update_run_status(run_id=run_id, status="COMPLETED", finished=True)
+            from app.services.sheet_export_service import schedule_sheet_sync
+            schedule_sheet_sync(tech)
             await event_broker.emit(
                 event_type="RUN_COMPLETED",
                 message=f"Screening Run #{run_id} completed successfully.",

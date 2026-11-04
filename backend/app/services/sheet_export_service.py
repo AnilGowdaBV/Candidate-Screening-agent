@@ -268,10 +268,10 @@ async def export_candidates_to_google_sheet(
             .join(ScreeningResult, ScreeningResult.candidate_id == Candidate.id)
             .where(
                 ScreeningResult.id.in_(res_subquery),
-                ScreeningResult.go_status.like('%_DETECTED'),
-                ~ScreeningResult.go_status.like('%NOT_DETECTED%')
+                ScreeningResult.go_status.like("%_DETECTED"),
+                ~ScreeningResult.go_status.like("%NOT_DETECTED%"),
             )
-            .order_by(Candidate.id.asc())
+            .order_by(ScreeningResult.search_order.asc(), Candidate.id.asc())
         )
         rows = db.execute(stmt).all()
         total_exported = len(rows)

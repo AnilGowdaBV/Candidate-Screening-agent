@@ -17,7 +17,7 @@ AUTH_SELECTORS = {
 # Search Page Selectors
 SEARCH_SELECTORS = {
     "search_container": '#candidate-search-results, .candidates-list, .search-results, .list-view',
-    "candidate_cards": '.candidate-row, .ats-resume-profile',
+    "candidate_cards": '.candidate-row',
     "candidate_link": '.candidate-row, a[href*="/candidate/"]',
     "candidate_name": '.candidate-name .readonly-field, .candidate-name, .name-row',
     "view_profile_button": '.button-download-resume, a:has-text("View profile")',

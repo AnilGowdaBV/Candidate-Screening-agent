@@ -80,6 +80,7 @@ class ScreeningRepository:
         error_code: Optional[str] = None,
         error_message: Optional[str] = None,
         languages_found: Optional[str] = None,
+        search_order: Optional[int] = None,
     ) -> ScreeningResult:
         """Store the technical outcome of examining a candidate."""
         result = ScreeningResult(
@@ -92,6 +93,7 @@ class ScreeningRepository:
             error_code=error_code,
             error_message=error_message,
             languages_found=languages_found,
+            search_order=search_order,
             checked_at=datetime.now(timezone.utc),
         )
         self.db.add(result)
