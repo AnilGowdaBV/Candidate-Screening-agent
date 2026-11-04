@@ -29,6 +29,30 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
     return ScreeningRunRead.model_validate(run)
 
 
+@router.get("/technology-counts")
+def get_technology_counts():
+    """Return candidate totals for every technology in one database connection."""
+    from sqlalchemy import text
+    from app.database.session import TECHNOLOGY_DB_MAP, _uses_postgres, get_engine_for_tech
+
+    counts = {}
+    techs = [tech for tech in TECHNOLOGY_DB_MAP if tech != "qa"]
+    if _uses_postgres():
+        engine = get_engine_for_tech("golang")
+        with engine.connect() as conn:
+            for tech in techs:
+                counts[tech] = conn.execute(
+                    text(f'SELECT COUNT(*) FROM "{tech}".candidates')
+                ).scalar() or 0
+        return counts
+
+    for tech in techs:
+        engine = get_engine_for_tech(tech)
+        with engine.connect() as conn:
+            counts[tech] = conn.execute(text("SELECT COUNT(*) FROM candidates")).scalar() or 0
+    return counts
+
+
 @router.get("/metrics", response_model=DashboardMetrics)
 def get_metrics(run_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
     """Retrieve real-time metrics computed directly from database records."""

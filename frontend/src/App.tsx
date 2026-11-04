@@ -12,6 +12,7 @@ import { RunHistory } from './components/RunHistory';
 import {
   fetchStatus,
   fetchMetrics,
+  fetchTechnologyCounts,
   fetchEvents,
   fetchCandidates,
   fetchRuns,
@@ -60,18 +61,12 @@ export const App: React.FC = () => {
 
   // Fetch counts for all technologies to display on top cards
   const refreshAllCounts = useCallback(async () => {
-    const keys: TechnologyKey[] = ['golang', 'python', 'java', 'javascript', 'typescript', 'frontend', 'qa_automation'];
-    const results = await Promise.allSettled(keys.map((k) => fetchMetrics(k)));
-    setTechCounts((prev) => {
-      const updated = { ...prev };
-      results.forEach((res, idx) => {
-        if (res.status === 'fulfilled') {
-          updated[keys[idx]] =
-            res.value.candidates_processed || res.value.candidates_discovered || 0;
-        }
-      });
-      return updated;
-    });
+    try {
+      const counts = await fetchTechnologyCounts();
+      setTechCounts((prev) => ({ ...prev, ...counts }));
+    } catch (err) {
+      console.error('Failed to refresh technology counts:', err);
+    }
   }, []);
 
   // Load core status and metrics for selected technology

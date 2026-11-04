@@ -15,6 +15,12 @@ export async function fetchStatus(): Promise<SystemStatus> {
   return res.json();
 }
 
+export async function fetchTechnologyCounts(): Promise<Record<string, number>> {
+  const res = await fetch(`${API_BASE}/technology-counts`);
+  if (!res.ok) throw new Error(`Technology counts error: ${res.statusText}`);
+  return res.json();
+}
+
 export async function fetchMetrics(technology = 'golang', runId?: number): Promise<DashboardMetrics> {
   const params = new URLSearchParams({ technology });
   if (runId) params.append('run_id', runId.toString());

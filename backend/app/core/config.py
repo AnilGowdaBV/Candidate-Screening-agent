@@ -64,8 +64,6 @@ class Settings(BaseSettings):
             self.DATABASE_URL = "postgresql+psycopg://" + self.DATABASE_URL[len("postgres://") :]
         elif self.DATABASE_URL.startswith("postgresql://"):
             self.DATABASE_URL = "postgresql+psycopg://" + self.DATABASE_URL[len("postgresql://") :]
-        if "pooler.supabase.com" in self.DATABASE_URL and ":5432/" in self.DATABASE_URL:
-            self.DATABASE_URL = self.DATABASE_URL.replace(":5432/", ":6543/", 1)
         if not self.GITHUB_TOKEN and self.GITHUB_TOKEN_PART1 and self.GITHUB_TOKEN_PART2:
             self.GITHUB_TOKEN = SecretStr(
                 f"{self.GITHUB_TOKEN_PART1.strip()}{self.GITHUB_TOKEN_PART2.strip()}"
