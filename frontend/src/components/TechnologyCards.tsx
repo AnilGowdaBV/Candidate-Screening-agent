@@ -163,7 +163,7 @@ interface TechnologyCardsProps {
 export const TechnologyCards: React.FC<TechnologyCardsProps> = ({
   selectedTechnology,
   onSelectTechnology,
-  candidateCounts = { golang: 177, python: 0, java: 0, javascript: 0, typescript: 0, frontend: 0, qa_automation: 0 },
+  candidateCounts = { golang: 0, python: 0, java: 0, javascript: 0, typescript: 0, frontend: 0, qa_automation: 0 },
 }) => {
   return (
     <div>
@@ -210,7 +210,7 @@ export const TechnologyCards: React.FC<TechnologyCardsProps> = ({
         {TECHNOLOGIES.map((t) => {
           const isSelected = selectedTechnology === t.key;
           const count = candidateCounts[t.key] ?? 0;
-          const isGoCompleted = t.key === 'golang' && count >= 177;
+          const isGoCompleted = count > 0;
 
           return (
             <div

@@ -43,7 +43,7 @@ export const App: React.FC = () => {
   const [selectedTechnology, setSelectedTechnology] = useState<TechnologyKey>('java');
   const [searchUrl, setSearchUrl] = useState<string>('');
   const [techCounts, setTechCounts] = useState<Record<TechnologyKey, number>>({
-    golang: 177,
+    golang: 0,
     python: 0,
     java: 0,
     javascript: 0,
