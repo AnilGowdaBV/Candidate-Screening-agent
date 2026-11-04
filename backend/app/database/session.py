@@ -68,8 +68,8 @@ def get_engine_for_tech(technology: str = "golang") -> Engine:
                 _engines["postgres"] = create_engine(
                     settings.DATABASE_URL,
                     pool_pre_ping=True,
-                    pool_size=1,
-                    max_overflow=0,
+                    pool_size=5,
+                    max_overflow=2,
                     echo=False,
                     connect_args={"prepare_threshold": None},
                 )
