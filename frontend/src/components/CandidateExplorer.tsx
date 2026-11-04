@@ -117,10 +117,10 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
     { id: 'GITHUB_NOT_FOUND', label: 'GitHub Missing' },
     { id: 'GO_DETECTED', label: `${currentTech.name} Detected` },
     { id: 'GO_NOT_DETECTED', label: `${currentTech.name} Not Found` },
-    { id: 'NOTE_ADDED', label: 'Note Added' },
-    { id: 'NOTE_ALREADY_EXISTS', label: 'Notes Existed' },
-    { id: 'NEEDS_REVIEW', label: 'Needs Review' },
-    { id: 'GITROLL_SCORED', label: 'GitScore' },
+    // { id: 'NOTE_ADDED', label: 'Note Added' },
+    // { id: 'NOTE_ALREADY_EXISTS', label: 'Notes Existed' },
+    // { id: 'NEEDS_REVIEW', label: 'Needs Review' },
+    // { id: 'GITROLL_SCORED', label: 'GitScore' },
   ];
 
   const getTechStatusBadge = (status?: string, githubUrl?: string | null) => {
