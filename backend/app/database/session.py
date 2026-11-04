@@ -41,11 +41,11 @@ _sessionmakers: dict[str, sessionmaker] = {}
 
 
 def _uses_mysql() -> bool:
-    return settings.DATABASE_URL.startswith("mysql")
+    return False
 
 
 def _uses_postgres() -> bool:
-    return settings.DATABASE_URL.startswith("postgresql")
+    return False
 
 
 def _canonical_tech(technology: str | None) -> str:
@@ -64,31 +64,18 @@ def _mysql_database_name(tech: str) -> str:
 def get_engine_for_tech(technology: str = "golang") -> Engine:
     tech = _canonical_tech(technology)
     if tech not in _engines:
-        if _uses_postgres():
-            if "postgres" not in _engines:
-                _engines["postgres"] = create_engine(
-                    settings.DATABASE_URL,
-                    poolclass=NullPool,
-                    echo=False,
-                    connect_args={"prepare_threshold": None},
-                )
-            eng = _engines["postgres"].execution_options(schema_translate_map={None: tech})
-        elif _uses_mysql():
-            url = make_url(settings.DATABASE_URL).set(database=_mysql_database_name(tech))
-            eng = create_engine(url, pool_pre_ping=True, echo=False)
-        else:
-            db_path = base_dir / TECHNOLOGY_DB_MAP[tech]
-            eng = create_engine(
-                f"sqlite:///{db_path}",
-                connect_args={"check_same_thread": False},
-                echo=False,
-            )
+        db_path = base_dir / TECHNOLOGY_DB_MAP[tech]
+        eng = create_engine(
+            f"sqlite:///{db_path}",
+            connect_args={"check_same_thread": False},
+            echo=False,
+        )
 
-            @event.listens_for(eng, "connect")
-            def set_sqlite_pragma(dbapi_connection, connection_record):
-                cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.close()
+        @event.listens_for(eng, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
         _engines[tech] = eng
         _sessionmakers[tech] = sessionmaker(autocommit=False, autoflush=False, bind=eng)
     return _engines[tech]

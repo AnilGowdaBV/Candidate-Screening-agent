@@ -3,7 +3,7 @@ services:
     name: candidate-screening-api
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: .
     plan: starter
     envVars:
       - key: ENVIRONMENT
