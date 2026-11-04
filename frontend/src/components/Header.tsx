@@ -85,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({ status, selectedTechnology = 'go
                 fontWeight: '800',
                 letterSpacing: '-0.02em',
                 fontFamily: 'var(--font-display)',
-                background: 'linear-gradient(180deg, #ffffff 30%, #cbd5e1 100%)',
+                background: 'linear-gradient(180deg, #0f172a 30%, #334155 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
               }}
@@ -121,19 +121,19 @@ export const Header: React.FC<HeaderProps> = ({ status, selectedTechnology = 'go
         <div
           className="status-pill pill-idle"
           title="Running locally on Windows workstation"
-          style={{ background: 'rgba(255, 255, 255, 0.04)', borderColor: 'rgba(255, 255, 255, 0.08)' }}
+          style={{ background: '#eef2ff', borderColor: '#c7d2fe', color: '#4338ca' }}
         >
-          <Laptop size={13} color="#94a3b8" />
+          <Laptop size={13} color="#4338ca" />
           <span>Local Engine</span>
         </div>
 
         <div
           className="status-pill pill-idle"
           title={status?.database_ready ? 'SQLite DB connected' : 'Database unreachable'}
-          style={{ background: 'rgba(16, 185, 129, 0.06)', borderColor: 'rgba(16, 185, 129, 0.25)' }}
+          style={{ background: '#ecfdf5', borderColor: '#6ee7b7', color: '#047857' }}
         >
-          <Database size={13} color={status?.database_ready ? '#10b981' : '#ef4444'} />
-          <span style={{ color: status?.database_ready ? '#a7f3d0' : '#fca5a5' }}>
+          <Database size={13} color={status?.database_ready ? '#047857' : '#b91c1c'} />
+          <span style={{ color: status?.database_ready ? '#047857' : '#b91c1c' }}>
             SQLite Multi-DB
           </span>
         </div>
@@ -141,10 +141,10 @@ export const Header: React.FC<HeaderProps> = ({ status, selectedTechnology = 'go
         <div
           className="status-pill pill-idle"
           title={status?.is_github_configured ? 'GitHub Token Ready' : 'GitHub Token Missing in .env'}
-          style={{ background: 'rgba(6, 182, 212, 0.06)', borderColor: 'rgba(6, 182, 212, 0.25)' }}
+          style={{ background: '#ecfeff', borderColor: '#67e8f9', color: '#0e7490' }}
         >
-          <Github size={13} color={status?.is_github_configured ? '#06b6d4' : '#f59e0b'} />
-          <span style={{ color: status?.is_github_configured ? '#a5f3fc' : '#fde68a' }}>
+          <Github size={13} color={status?.is_github_configured ? '#0e7490' : '#b45309'} />
+          <span style={{ color: status?.is_github_configured ? '#0e7490' : '#b45309' }}>
             GitHub API
           </span>
         </div>
@@ -152,10 +152,10 @@ export const Header: React.FC<HeaderProps> = ({ status, selectedTechnology = 'go
         <div
           className="status-pill pill-idle"
           title={status?.is_instahyre_configured ? 'Instahyre Auth Ready' : 'Manual Login / Pending in .env'}
-          style={{ background: 'rgba(99, 102, 241, 0.06)', borderColor: 'rgba(99, 102, 241, 0.25)' }}
+          style={{ background: '#eef2ff', borderColor: '#c7d2fe', color: '#4338ca' }}
         >
-          <Globe size={13} color={status?.is_instahyre_configured ? '#818cf8' : '#f59e0b'} />
-          <span style={{ color: status?.is_instahyre_configured ? '#c7d2fe' : '#fde68a' }}>
+          <Globe size={13} color={status?.is_instahyre_configured ? '#4338ca' : '#b45309'} />
+          <span style={{ color: status?.is_instahyre_configured ? '#4338ca' : '#b45309' }}>
             Instahyre Session
           </span>
         </div>

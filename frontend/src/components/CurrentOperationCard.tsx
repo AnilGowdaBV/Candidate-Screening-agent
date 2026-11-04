@@ -43,17 +43,17 @@ export const CurrentOperationCard: React.FC<CurrentOperationCardProps> = ({
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         {/* Main Status & Operation */}
-        <div style={{ background: 'rgba(6, 10, 20, 0.5)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+        <div style={{ background: 'var(--bg-card-subtle)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', fontWeight: 600 }}>
             Current Operation
           </div>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             {isRunning && <span className="status-dot dot-indigo dot-pulse" />}
             {operation?.current_operation || 'Agent is idle'}
           </div>
 
           <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-            Status: <span style={{ color: '#e2e8f0', fontWeight: '600' }}>{operation?.current_status || 'Ready for screening'}</span>
+            Status: <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{operation?.current_status || 'Ready for screening'}</span>
           </div>
 
           {operation?.candidate_reference && (
@@ -67,7 +67,7 @@ export const CurrentOperationCard: React.FC<CurrentOperationCardProps> = ({
         </div>
 
         {/* Stage & Plan */}
-        <div style={{ background: 'rgba(6, 10, 20, 0.5)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+        <div style={{ background: 'var(--bg-card-subtle)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', fontWeight: 600 }}>
             Workflow Stage
           </div>
@@ -79,13 +79,13 @@ export const CurrentOperationCard: React.FC<CurrentOperationCardProps> = ({
             {operation?.last_completed_action && (
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <CheckCircle size={13} color="var(--accent-emerald)" />
-                <span>Last: <span style={{ color: '#cbd5e1' }}>{operation.last_completed_action}</span></span>
+                <span>Last: <span style={{ color: 'var(--text-main)' }}>{operation.last_completed_action}</span></span>
               </div>
             )}
             {operation?.next_planned_action && (
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <ArrowRight size={13} color="var(--accent-primary)" />
-                <span>Next: <span style={{ color: '#cbd5e1' }}>{operation.next_planned_action}</span></span>
+                <span>Next: <span style={{ color: 'var(--text-main)' }}>{operation.next_planned_action}</span></span>
               </div>
             )}
           </div>

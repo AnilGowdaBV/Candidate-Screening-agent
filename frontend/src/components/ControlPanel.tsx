@@ -49,7 +49,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        background: 'rgba(11, 17, 34, 0.85)',
+        background: '#ffffff',
       }}
     >
       {/* Main Single-Row Command Bar */}
@@ -70,10 +70,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             value={selectedTechnology}
             onChange={(e) => onSelectTechnology(e.target.value as TechnologyKey)}
             style={{
-              background: 'rgba(6, 10, 20, 0.95)',
+              background: '#ffffff',
               border: `1.5px solid ${currentTech.color}`,
               borderRadius: 'var(--radius-sm)',
-              color: '#ffffff',
+              color: 'var(--text-main)',
               padding: '7px 12px',
               fontSize: '13px',
               fontWeight: 700,
@@ -83,7 +83,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             }}
           >
             {TECHNOLOGIES.map(t => (
-              <option key={t.key} value={t.key} style={{ background: '#0b1120', color: '#ffffff' }}>
+              <option key={t.key} value={t.key} style={{ background: '#ffffff', color: '#0f172a' }}>
                 {t.name}
               </option>
             ))}
@@ -97,7 +97,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            background: 'rgba(6, 10, 20, 0.85)',
+            background: '#ffffff',
             border: '1px solid var(--border-medium)',
             borderRadius: 'var(--radius-sm)',
             padding: '7px 12px',
@@ -115,7 +115,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               background: 'transparent',
               border: 'none',
               outline: 'none',
-              color: '#ffffff',
+              color: 'var(--text-main)',
               fontSize: '12px',
               fontFamily: 'var(--font-mono)',
               flex: 1,
@@ -175,7 +175,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             style={{
               padding: '8px 16px',
               fontSize: '13px',
-              background: canStart ? `linear-gradient(135deg, ${currentTech.color} 0%, #4338ca 100%)` : 'rgba(255, 255, 255, 0.08)',
+              background: canStart ? `linear-gradient(135deg, ${currentTech.color} 0%, #4338ca 100%)` : '#e2e8f0',
               boxShadow: canStart ? `0 2px 14px ${currentTech.glowColor}` : 'none',
               opacity: canStart ? 1 : 0.45,
             }}

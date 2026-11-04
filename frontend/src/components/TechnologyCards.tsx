@@ -17,64 +17,64 @@ export const TECHNOLOGIES: TechCardInfo[] = [
     key: 'golang',
     name: 'Go lang',
     dbFileName: 'screening_golang.db',
-    color: '#00ADD8',
-    bgColor: 'rgba(0, 173, 216, 0.12)',
-    glowColor: 'rgba(0, 173, 216, 0.35)',
-    borderColor: 'rgba(0, 173, 216, 0.5)',
+    color: '#0891B2',
+    bgColor: '#e0f7fa',
+    glowColor: 'rgba(8, 145, 178, 0.28)',
+    borderColor: '#67e8f9',
   },
   {
     key: 'python',
     name: 'Python',
     dbFileName: 'screening_python.db',
-    color: '#38BDF8',
-    bgColor: 'rgba(56, 189, 248, 0.12)',
-    glowColor: 'rgba(56, 189, 248, 0.35)',
-    borderColor: 'rgba(56, 189, 248, 0.5)',
+    color: '#0284C7',
+    bgColor: '#e0f2fe',
+    glowColor: 'rgba(2, 132, 199, 0.28)',
+    borderColor: '#7dd3fc',
   },
   {
     key: 'java',
     name: 'Java',
     dbFileName: 'screening_java.db',
-    color: '#F97316',
-    bgColor: 'rgba(249, 115, 22, 0.12)',
-    glowColor: 'rgba(249, 115, 22, 0.35)',
-    borderColor: 'rgba(249, 115, 22, 0.5)',
+    color: '#EA580C',
+    bgColor: '#fff7ed',
+    glowColor: 'rgba(234, 88, 12, 0.28)',
+    borderColor: '#fdba74',
   },
   {
     key: 'javascript',
     name: 'JavaScript',
     dbFileName: 'screening_javascript.db',
-    color: '#FACC15',
-    bgColor: 'rgba(250, 204, 21, 0.12)',
-    glowColor: 'rgba(250, 204, 21, 0.35)',
-    borderColor: 'rgba(250, 204, 21, 0.5)',
+    color: '#CA8A04',
+    bgColor: '#fefce8',
+    glowColor: 'rgba(202, 138, 4, 0.28)',
+    borderColor: '#fde047',
   },
   {
     key: 'typescript',
     name: 'TypeScript',
     dbFileName: 'screening_typescript.db',
-    color: '#60A5FA',
-    bgColor: 'rgba(96, 165, 250, 0.12)',
-    glowColor: 'rgba(96, 165, 250, 0.35)',
-    borderColor: 'rgba(96, 165, 250, 0.5)',
+    color: '#2563EB',
+    bgColor: '#eff6ff',
+    glowColor: 'rgba(37, 99, 235, 0.28)',
+    borderColor: '#93c5fd',
   },
   {
     key: 'frontend',
     name: 'Frontend',
     dbFileName: 'screening_frontend.db',
-    color: '#EC4899',
-    bgColor: 'rgba(236, 72, 153, 0.12)',
-    glowColor: 'rgba(236, 72, 153, 0.35)',
-    borderColor: 'rgba(236, 72, 153, 0.5)',
+    color: '#DB2777',
+    bgColor: '#fdf2f8',
+    glowColor: 'rgba(219, 39, 119, 0.28)',
+    borderColor: '#f9a8d4',
   },
   {
     key: 'qa_automation',
     name: 'QA Automation',
     dbFileName: 'screening_qa_automation.db',
-    color: '#10B981',
-    bgColor: 'rgba(16, 185, 129, 0.12)',
-    glowColor: 'rgba(16, 185, 129, 0.35)',
-    borderColor: 'rgba(16, 185, 129, 0.5)',
+    color: '#059669',
+    bgColor: '#ecfdf5',
+    glowColor: 'rgba(5, 150, 105, 0.28)',
+    borderColor: '#6ee7b7',
   },
 ];
 
@@ -218,12 +218,8 @@ export const TechnologyCards: React.FC<TechnologyCardsProps> = ({
               onClick={() => onSelectTechnology(t.key)}
               style={{
                 cursor: 'pointer',
-                background: isSelected
-                  ? `linear-gradient(135deg, ${t.bgColor} 0%, rgba(13, 20, 38, 0.95) 100%)`
-                  : 'rgba(11, 16, 30, 0.7)',
-                border: isSelected
-                  ? `1.5px solid ${t.color}`
-                  : '1px solid rgba(255, 255, 255, 0.08)',
+                background: t.bgColor,
+                border: isSelected ? `2px solid ${t.color}` : `1px solid ${t.borderColor}`,
                 borderRadius: 'var(--radius-sm)',
                 padding: '12px 14px',
                 display: 'flex',
@@ -233,8 +229,8 @@ export const TechnologyCards: React.FC<TechnologyCardsProps> = ({
                 minHeight: '76px',
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                 boxShadow: isSelected
-                  ? `0 0 16px ${t.glowColor}, inset 0 1px 0 rgba(255, 255, 255, 0.15)`
-                  : '0 2px 6px rgba(0, 0, 0, 0.3)',
+                  ? `0 8px 20px ${t.glowColor}`
+                  : '0 2px 8px rgba(15, 23, 42, 0.06)',
                 position: 'relative',
                 overflow: 'hidden',
               }}
@@ -264,7 +260,7 @@ export const TechnologyCards: React.FC<TechnologyCardsProps> = ({
                     style={{
                       fontWeight: 700,
                       fontSize: '13.5px',
-                      color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                      color: t.color,
                       lineHeight: '1.2',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -283,7 +279,7 @@ export const TechnologyCards: React.FC<TechnologyCardsProps> = ({
                       fontSize: '17px',
                       fontWeight: 800,
                       fontFamily: 'var(--font-mono)',
-                      color: count > 0 ? (isGoCompleted ? '#34d399' : t.color) : 'var(--text-muted)',
+                      color: t.color,
                       lineHeight: '1',
                       letterSpacing: '-0.02em',
                     }}
@@ -321,23 +317,9 @@ export const TechnologyCards: React.FC<TechnologyCardsProps> = ({
                     padding: '1px 6px',
                     borderRadius: '4px',
                     whiteSpace: 'nowrap',
-                    background: isGoCompleted
-                      ? 'rgba(16, 185, 129, 0.15)'
-                      : isSelected
-                      ? t.bgColor
-                      : 'rgba(255, 255, 255, 0.04)',
-                    color: isGoCompleted
-                      ? '#34d399'
-                      : isSelected
-                      ? t.color
-                      : 'var(--text-dim)',
-                    border: `1px solid ${
-                      isGoCompleted
-                        ? 'rgba(16, 185, 129, 0.3)'
-                        : isSelected
-                        ? t.borderColor
-                        : 'rgba(255, 255, 255, 0.06)'
-                    }`,
+                    background: '#ffffff',
+                    color: t.color,
+                    border: `1px solid ${t.borderColor}`,
                   }}
                 >
                   {isGoCompleted ? 'Complete' : isSelected ? 'Active' : 'Select'}

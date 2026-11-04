@@ -144,7 +144,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
           className="status-pill pill-completed"
           style={{
             background: 'rgba(16, 185, 129, 0.15)',
-            color: '#34d399',
+            color: '#047857',
             borderColor: 'rgba(16, 185, 129, 0.4)',
           }}
         >
@@ -185,10 +185,10 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
             className="status-pill pill-idle"
             style={{
               background: 'rgba(239, 68, 68, 0.08)',
-              color: '#f87171',
               border: '1px solid rgba(239, 68, 68, 0.25)',
               fontSize: '11px',
               fontWeight: 600,
+              color: '#b91c1c',
             }}
           >
             {raw}
@@ -210,7 +210,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                 fontWeight: 700,
                 background: 'rgba(16, 185, 129, 0.15)',
                 border: '1px solid rgba(16, 185, 129, 0.4)',
-                color: '#34d399',
+                color: '#047857',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -242,7 +242,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
             className="status-pill"
             style={{
               background: 'rgba(245, 158, 11, 0.12)',
-              color: '#fbbf24',
+              color: '#b45309',
               border: '1px solid rgba(245, 158, 11, 0.35)',
               maxWidth: '240px',
               overflow: 'hidden',
@@ -380,10 +380,10 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
             }`,
             color:
               toastMessage.type === 'success'
-                ? '#34d399'
+                ? '#047857'
                 : toastMessage.type === 'error'
-                ? '#f87171'
-                : '#38bdf8',
+                ? '#b91c1c'
+                : '#0369a1',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -444,11 +444,11 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
               onChange={(e) => onSearchChange(e.target.value)}
               style={{
                 width: '100%',
-                background: 'rgba(6, 10, 20, 0.9)',
+                background: '#ffffff',
                 border: '1px solid var(--border-medium)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '8px 12px 8px 34px',
-                color: '#ffffff',
+                color: 'var(--text-main)',
                 fontSize: '12px',
                 outline: 'none',
                 fontFamily: 'var(--font-sans)',
@@ -465,7 +465,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
               gap: '4px',
               fontSize: '11px',
               color: 'var(--text-dim)',
-              background: 'rgba(6, 10, 20, 0.7)',
+              background: '#f8fafc',
               padding: '3px 6px',
               borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)',
@@ -524,7 +524,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                 key={f.id}
                 onClick={() => onFilterChange(f.id)}
                 style={{
-                  background: isSelected ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.04)',
+                  background: isSelected ? 'var(--accent-primary)' : '#f8fafc',
                   color: isSelected ? '#ffffff' : 'var(--text-muted)',
                   border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                   borderRadius: '20px',
@@ -692,20 +692,20 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                             borderRadius: '50%',
                             background:
                               'linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(6, 182, 212, 0.25) 100%)',
-                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            border: '1px solid rgba(67, 56, 202, 0.25)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: '11px',
                             fontWeight: 700,
-                            color: '#e2e8f0',
+                            color: '#4338ca',
                             fontFamily: 'var(--font-display)',
                             flexShrink: 0,
                           }}
                         >
                           {getInitials(cand.name)}
                         </div>
-                        <span style={{ fontWeight: 600, color: '#f8fafc' }}>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
                           {cand.name}
                         </span>
                       </div>
@@ -741,7 +741,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                           target="_blank"
                           rel="noreferrer"
                           style={{
-                            color: '#93c5fd',
+                            color: '#1d4ed8',
                             textDecoration: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -776,7 +776,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                                 fontWeight: 600,
                                 background: 'rgba(56, 189, 248, 0.1)',
                                 border: '1px solid rgba(56, 189, 248, 0.28)',
-                                color: '#7dd3fc',
+                                color: '#0369a1',
                                 whiteSpace: 'nowrap',
                               }}
                             >
@@ -805,7 +805,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                             fontFamily: 'var(--font-mono)',
                             background: 'rgba(16, 185, 129, 0.12)',
                             border: '1px solid rgba(16, 185, 129, 0.3)',
-                            color: '#34d399',
+                            color: '#047857',
                             whiteSpace: 'nowrap',
                           }}
                         >
@@ -830,7 +830,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                             fontWeight: 600,
                             background: 'rgba(56, 189, 248, 0.1)',
                             border: '1px solid rgba(56, 189, 248, 0.25)',
-                            color: '#38bdf8',
+                            color: '#0369a1',
                             whiteSpace: 'nowrap',
                           }}
                         >
@@ -855,7 +855,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                             fontWeight: 600,
                             background: 'rgba(168, 85, 247, 0.1)',
                             border: '1px solid rgba(168, 85, 247, 0.25)',
-                            color: '#d8b4fe',
+                            color: '#6d28d9',
                             whiteSpace: 'nowrap',
                           }}
                         >
@@ -891,7 +891,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                                     fontWeight: 700,
                                     background: 'rgba(245, 158, 11, 0.12)',
                                     border: '1px solid rgba(245, 158, 11, 0.35)',
-                                    color: '#fbbf24',
+                                    color: '#b45309',
                                     textDecoration: 'none',
                                   }}
                                 >
@@ -912,7 +912,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                                   fontWeight: 700,
                                   background: 'rgba(245, 158, 11, 0.08)',
                                   border: '1px solid rgba(245, 158, 11, 0.25)',
-                                  color: '#fde68a',
+                                  color: '#b45309',
                                 }}
                               >
                                 {part}
@@ -948,7 +948,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                               borderRadius: '6px',
                               background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.18) 0%, rgba(249, 115, 22, 0.18) 100%)',
                               border: '1px solid rgba(234, 179, 8, 0.5)',
-                              color: '#fef08a',
+                              color: '#b45309',
                               fontWeight: 700,
                               fontSize: '13px',
                               width: 'fit-content',
@@ -1069,7 +1069,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                               fontWeight: 600,
                               background: 'rgba(16, 185, 129, 0.12)',
                               border: '1px solid rgba(16, 185, 129, 0.35)',
-                              color: '#34d399',
+                              color: '#047857',
                               cursor: 'pointer',
                               transition: 'all 0.15s ease',
                               whiteSpace: 'nowrap',
@@ -1092,7 +1092,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                               fontWeight: 600,
                               background: 'rgba(239, 68, 68, 0.12)',
                               border: '1px solid rgba(239, 68, 68, 0.35)',
-                              color: '#f87171',
+                              color: '#b91c1c',
                               cursor: 'pointer',
                               transition: 'all 0.15s ease',
                               whiteSpace: 'nowrap',

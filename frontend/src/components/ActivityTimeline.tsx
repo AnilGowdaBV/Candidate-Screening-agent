@@ -18,15 +18,15 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ events }) =>
 
   const getEventBadge = (type: string) => {
     if (type.includes('DETECTED') || type.includes('CONFIRMED') || type.includes('STARTED') || type.includes('COMPLETED')) {
-      return { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', border: 'rgba(16, 185, 129, 0.35)' };
+      return { bg: 'rgba(16, 185, 129, 0.12)', text: '#047857', border: 'rgba(16, 185, 129, 0.35)' };
     }
     if (type.includes('ERROR') || type.includes('FAILED') || type.includes('STOPPED')) {
-      return { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171', border: 'rgba(239, 68, 68, 0.35)' };
+      return { bg: 'rgba(239, 68, 68, 0.12)', text: '#b91c1c', border: 'rgba(239, 68, 68, 0.35)' };
     }
     if (type.includes('PAUSE') || type.includes('REVIEW') || type.includes('RATE_LIMIT') || type.includes('NOT_FOUND')) {
-      return { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.35)' };
+      return { bg: 'rgba(245, 158, 11, 0.14)', text: '#b45309', border: 'rgba(245, 158, 11, 0.35)' };
     }
-    return { bg: 'rgba(99, 102, 241, 0.15)', text: '#a5b4fc', border: 'rgba(99, 102, 241, 0.35)' };
+    return { bg: 'rgba(99, 102, 241, 0.12)', text: '#4338ca', border: 'rgba(99, 102, 241, 0.3)' };
   };
 
   return (
@@ -38,7 +38,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ events }) =>
         height: '380px',
         padding: '0',
         overflow: 'hidden',
-        background: 'rgba(7, 11, 22, 0.85)',
+        background: '#ffffff',
       }}
     >
       {/* Terminal Title Bar */}
@@ -48,7 +48,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ events }) =>
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 18px',
-          background: 'rgba(5, 8, 17, 0.95)',
+          background: '#f8fafc',
           borderBottom: '1px solid var(--border-medium)',
         }}
       >
@@ -117,8 +117,8 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ events }) =>
               <div
                 key={e.id}
                 style={{
-                  background: 'rgba(15, 23, 42, 0.45)',
-                  border: '1px solid rgba(255, 255, 255, 0.04)',
+                  background: '#f8fafc',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: '6px',
                   padding: '7px 12px',
                   display: 'flex',
@@ -148,7 +148,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ events }) =>
                   {e.event_type}
                 </span>
 
-                <span style={{ color: '#e2e8f0', flex: 1, wordBreak: 'break-word', fontSize: '12px' }}>
+                <span style={{ color: 'var(--text-secondary)', flex: 1, wordBreak: 'break-word', fontSize: '12px' }}>
                   {e.message}
                 </span>
               </div>

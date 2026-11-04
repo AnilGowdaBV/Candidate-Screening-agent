@@ -145,16 +145,10 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
               }
             }}
             style={{
-              background: isSelected
-                ? 'linear-gradient(180deg, rgba(99, 102, 241, 0.2) 0%, var(--bg-card) 100%)'
-                : item.highlight
-                ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, var(--bg-card) 100%)'
-                : 'var(--bg-card)',
+              background: `${item.color}14`,
               border: isSelected
-                ? `1.5px solid var(--accent-primary)`
-                : item.highlight
-                ? '1px solid rgba(16, 185, 129, 0.4)'
-                : '1px solid var(--border-subtle)',
+                ? `2px solid ${item.color}`
+                : `1px solid ${item.color}55`,
               borderRadius: 'var(--radius-sm)',
               padding: '12px 14px',
               display: 'flex',
@@ -163,10 +157,8 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
               cursor: item.filterId !== undefined ? 'pointer' : 'default',
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               boxShadow: isSelected
-                ? '0 0 16px rgba(99, 102, 241, 0.35)'
-                : item.highlight
-                ? '0 0 16px rgba(16, 185, 129, 0.2)'
-                : '0 2px 8px rgba(0, 0, 0, 0.3)',
+                ? `0 8px 18px ${item.glow}`
+                : '0 2px 8px rgba(15, 23, 42, 0.06)',
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -189,7 +181,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
               <span
                 style={{
                   fontSize: '11px',
-                  color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                  color: item.color,
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -203,7 +195,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                   width: '20px',
                   height: '20px',
                   borderRadius: '5px',
-                  background: `${item.color}15`,
+                  background: `${item.color}22`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -217,7 +209,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
               style={{
                 fontSize: '22px',
                 fontWeight: 800,
-                color: item.highlight ? '#34d399' : '#ffffff',
+                color: item.color,
                 fontFamily: 'var(--font-mono)',
                 lineHeight: '1.1',
               }}

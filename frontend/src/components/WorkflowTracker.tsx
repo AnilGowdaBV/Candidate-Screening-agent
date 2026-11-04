@@ -122,9 +122,9 @@ export const WorkflowTracker: React.FC<WorkflowTrackerProps> = ({
                     fontWeight: status === 'active' ? '700' : '500',
                     color:
                       status === 'completed'
-                        ? '#34d399'
+                        ? '#047857'
                         : status === 'active'
-                        ? '#ffffff'
+                        ? '#4338ca'
                         : 'var(--text-dim)',
                     lineHeight: '1.2',
                   }}
