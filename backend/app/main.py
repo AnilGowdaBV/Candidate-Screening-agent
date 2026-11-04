@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Candidate Screening Agent backend (version %s)", __version__)
     logger.info("Environment: %s | Dry run: %s", settings.ENVIRONMENT, settings.DRY_RUN)
     init_db("all")
-    logger.info("All technology SQLite databases verified and initialized")
+    logger.info("Databases initialized")
     yield
     logger.info("Shutting down Candidate Screening Agent backend")
 
@@ -40,15 +40,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Enable CORS for local Vite frontend
+    settings = get_settings()
+    origins = [item.strip() for item in settings.CORS_ORIGINS.split(",") if item.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-        ],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -58,11 +58,23 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def resolve_token(self):
+        if self.ENVIRONMENT == "production":
+            self.HEADLESS_BROWSER = True
+        if self.DATABASE_URL.startswith("postgres://"):
+            self.DATABASE_URL = "postgresql+psycopg://" + self.DATABASE_URL[len("postgres://") :]
+        elif self.DATABASE_URL.startswith("postgresql://"):
+            self.DATABASE_URL = "postgresql+psycopg://" + self.DATABASE_URL[len("postgresql://") :]
         if not self.GITHUB_TOKEN and self.GITHUB_TOKEN_PART1 and self.GITHUB_TOKEN_PART2:
             self.GITHUB_TOKEN = SecretStr(
                 f"{self.GITHUB_TOKEN_PART1.strip()}{self.GITHUB_TOKEN_PART2.strip()}"
             )
         return self
+
+    # Comma-separated browser origins allowed to call this API (the Vercel site URL).
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+        description="Allowed frontend origins",
+    )
 
     # Database
     DATABASE_URL: str = Field(

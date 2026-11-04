@@ -6,7 +6,8 @@ import {
   ActivityEvent,
 } from '../types';
 
-const API_BASE = '/api';
+const configuredApi = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
+export const API_BASE = configuredApi ? `${configuredApi}/api` : "/api";
 
 export async function fetchStatus(): Promise<SystemStatus> {
   const res = await fetch(`${API_BASE}/status`);

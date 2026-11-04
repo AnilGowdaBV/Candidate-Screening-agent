@@ -19,6 +19,7 @@ import {
   pauseRun,
   resumeRun,
   stopRun,
+  API_BASE,
 } from './services/api';
 
 import {
@@ -120,7 +121,7 @@ export const App: React.FC = () => {
 
   // Connect to live SSE stream for real-time activity events
   useEffect(() => {
-    const eventSource = new EventSource('/api/events/stream');
+    const eventSource = new EventSource(`${API_BASE}/events/stream`);
     eventSource.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data);

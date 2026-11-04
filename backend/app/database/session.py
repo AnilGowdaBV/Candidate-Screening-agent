@@ -41,6 +41,10 @@ def _uses_mysql() -> bool:
     return settings.DATABASE_URL.startswith("mysql")
 
 
+def _uses_postgres() -> bool:
+    return settings.DATABASE_URL.startswith("postgresql")
+
+
 def _canonical_tech(technology: str | None) -> str:
     tech = (technology or "golang").lower()
     if tech not in TECHNOLOGY_DB_MAP:
@@ -57,7 +61,14 @@ def _mysql_database_name(tech: str) -> str:
 def get_engine_for_tech(technology: str = "golang") -> Engine:
     tech = _canonical_tech(technology)
     if tech not in _engines:
-        if _uses_mysql():
+        if _uses_postgres():
+            from sqlalchemy import text
+
+            admin = create_engine(settings.DATABASE_URL, pool_pre_ping=True, echo=False)
+            with admin.begin() as conn:
+                conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{tech}"'))
+            eng = admin.execution_options(schema_translate_map={None: tech})
+        elif _uses_mysql():
             url = make_url(settings.DATABASE_URL).set(database=_mysql_database_name(tech))
             eng = create_engine(url, pool_pre_ping=True, echo=False)
         else:
@@ -105,6 +116,12 @@ def get_db(technology: str = Query("golang")) -> Generator[Session, None, None]:
 def _column_names(conn, table: str) -> set[str]:
     if conn.engine.dialect.name == "mysql":
         rows = conn.exec_driver_sql(f"SHOW COLUMNS FROM `{table}`").fetchall()
+        return {row[0] for row in rows}
+    if conn.engine.dialect.name == "postgresql":
+        rows = conn.exec_driver_sql(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+            (table,),
+        ).fetchall()
         return {row[0] for row in rows}
     rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
     return {row[1] for row in rows}

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: candidate-screening-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: INSTAHYRE_EMAIL
+        sync: false
+      - key: INSTAHYRE_PASSWORD
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: HEADLESS_BROWSER
+        value: "true"
+      - key: DRY_RUN
+        value: "true"
