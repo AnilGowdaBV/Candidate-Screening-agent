@@ -11,7 +11,7 @@ import {
   Loader2,
   ShieldCheck,
   X,
-  Briefcase,
+  // Briefcase,
   FileSpreadsheet,
   MapPin,
 } from 'lucide-react';
@@ -52,6 +52,7 @@ function getDemoOffers(candId: number): string[] {
   }
   return [first, second];
 }
+void getDemoOffers;
 
 interface CandidateExplorerProps {
   candidates: Candidate[];
@@ -131,9 +132,9 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
 
   const filterOptions = [
     { id: '', label: 'All Candidates' },
+    { id: 'GO_DETECTED', label: `${currentTech.name} Detected` },
     { id: 'GITHUB_FOUND', label: 'GitHub Found' },
     { id: 'GITHUB_NOT_FOUND', label: 'GitHub Missing' },
-    { id: 'GO_DETECTED', label: `${currentTech.name} Detected` },
     { id: 'GO_NOT_DETECTED', label: `${currentTech.name} Not Found` },
     // { id: 'NOTE_ADDED', label: 'Note Added' },
     // { id: 'NOTE_ALREADY_EXISTS', label: 'Notes Existed' },
@@ -298,6 +299,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
         return <span className="status-pill pill-idle">{noteAction.action_status}</span>;
     }
   };
+  void getNoteStatusBadge;
 
   const getInitials = (name?: string) => {
     if (!name) return '??';
@@ -664,7 +666,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
               <th style={{ width: '45px', whiteSpace: 'nowrap' }}>ID</th>
               <th style={{ minWidth: '160px', whiteSpace: 'nowrap' }}>Candidate Name</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>GitHub URL</th>
-              <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Offers From</th>
+              {/* <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Offers From</th> */}
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Current Salary</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Location</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Experience</th>
@@ -672,25 +674,25 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>{currentTech.name} Status</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Languages Found</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>GitScore</th>
-              <th style={{ whiteSpace: 'nowrap' }}>Instahyre Note Action</th>
-              <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Last Checked</th>
+              {/* <th style={{ whiteSpace: 'nowrap' }}>Instahyre Note Action</th> */}
+              {/* <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Last Checked</th> */}
               <th style={{ width: '1%', whiteSpace: 'nowrap', textAlign: 'center' }}>Decision</th>
             </tr>
           </thead>
           <tbody>
             {filteredCandidates.length === 0 ? (
               <tr>
-                <td colSpan={14} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
                   No candidate records match the active criteria in {currentTech.dbFileName}.
                 </td>
               </tr>
             ) : (
               filteredCandidates.map((cand) => {
                 const latestResult = cand.screening_results?.[cand.screening_results.length - 1];
-                const latestNote = cand.note_actions?.[cand.note_actions.length - 1];
-                const checkedTime = cand.last_seen_at
-                  ? new Date(cand.last_seen_at).toLocaleTimeString()
-                  : '—';
+                // const latestNote = cand.note_actions?.[cand.note_actions.length - 1];
+                // const checkedTime = cand.last_seen_at
+                //   ? new Date(cand.last_seen_at).toLocaleTimeString()
+                //   : '—';
                 const isDetected = Boolean(latestResult?.go_status && latestResult.go_status.endsWith('_DETECTED') && !latestResult.go_status.includes('NOT'));
                 const decision = getDecision(cand);
                 const rowClass = decision === 'SELECTED' ? 'row-selected' : decision === 'REJECTED' ? 'row-rejected' : '';
@@ -770,7 +772,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                       )}
                     </td>
 
-                    {/* Offers From (Demo for all detected candidates) */}
+                    {/* Offers From (Demo for all detected candidates)
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {isDetected ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
@@ -800,6 +802,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                         <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>—</span>
                       )}
                     </td>
+                    */}
 
                     {/* Current Salary (Extracted from Instahyre profile / search card) */}
                     <td style={{ whiteSpace: 'nowrap' }}>
@@ -976,15 +979,17 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                       )}
                     </td>
 
-                    {/* Note Action */}
+                    {/* Note Action
                     <td>
                       {getNoteStatusBadge(latestNote)}
                     </td>
+                    */}
 
-                    {/* Timestamp */}
+                    {/* Timestamp
                     <td style={{ color: 'var(--text-dim)', fontSize: '11px', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                       {checkedTime}
                     </td>
+                    */}
 
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
