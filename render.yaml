@@ -2,8 +2,8 @@ services:
   - type: web
     name: candidate-screening-api
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./backend
     plan: starter
     envVars:
       - key: ENVIRONMENT

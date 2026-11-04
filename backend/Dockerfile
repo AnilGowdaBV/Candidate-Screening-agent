@@ -1,9 +1,9 @@
 FROM mcr.microsoft.com/playwright/python:v1.47.0-jammy
 
 WORKDIR /app
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir "playwright==1.47.0"
-COPY backend/ /app/
+COPY . .
 ENV PYTHONPATH=/app
 ENV ENVIRONMENT=production
 
