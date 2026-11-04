@@ -429,7 +429,9 @@ class ScreeningOrchestrator:
             state_manager.complete_run()
             screen_repo.update_run_status(run_id=run_id, status="COMPLETED", finished=True)
             from app.services.sheet_export_service import schedule_sheet_sync
+            from app.services.hosted_db_sync import schedule_hosted_db_sync
             schedule_sheet_sync(tech)
+            schedule_hosted_db_sync(tech)
             await event_broker.emit(
                 event_type="RUN_COMPLETED",
                 message=f"Screening Run #{run_id} completed successfully.",
