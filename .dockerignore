@@ -4,3 +4,9 @@ backend/venv
 backend/.env
 .env
 **/*.pyc
+data/browser_profile
+data/screenshots
+data/*backup*
+data/test_isolated.db
+data/screening_agent.db
+data/screening_java_previous_batch.db
