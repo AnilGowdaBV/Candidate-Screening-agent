@@ -4,8 +4,6 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir "playwright==1.47.0"
 COPY backend/ /app/
-RUN mkdir -p /app/data
-COPY data/ /app/data/
 ENV PYTHONPATH=/app
 ENV ENVIRONMENT=production
 
