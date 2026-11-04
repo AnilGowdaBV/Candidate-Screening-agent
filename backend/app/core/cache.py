@@ -25,3 +25,10 @@ def cache_get(key: Any) -> Optional[Any]:
 def cache_put(key: Any, value: Any) -> None:
     with _lock:
         _values[key] = (time.time(), value)
+
+
+def cache_invalidate_prefix(*prefix: Any) -> None:
+    with _lock:
+        stale = [key for key in _values if isinstance(key, tuple) and key[: len(prefix)] == prefix]
+        for key in stale:
+            _values.pop(key, None)

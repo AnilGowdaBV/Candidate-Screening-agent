@@ -349,6 +349,18 @@ html, body {
 .data-table tr:hover td {
   background: #eef2ff;
 }
+.data-table tbody tr.row-selected td {
+  background: #dcfce7 !important;
+}
+.data-table tbody tr.row-selected:hover td {
+  background: #bbf7d0 !important;
+}
+.data-table tbody tr.row-rejected td {
+  background: #e5e7eb !important;
+}
+.data-table tbody tr.row-rejected:hover td {
+  background: #d1d5db !important;
+}
 
 /* Tech Code Badge */
 .code-tag {

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy import select, func
 from app.database.session import get_sessionmaker_for_tech
@@ -25,6 +26,9 @@ TECH_SHEET_MAP = {
 }
 
 DEFAULT_SHEET_URL = TECH_SHEET_MAP["golang"]
+_sheet_sync_lock = threading.Lock()
+_sheet_sync_timers: Dict[str, threading.Timer] = {}
+SHEET_SYNC_DELAY_SECONDS = 8.0
 
 def parse_coding_profiles(coding_profiles_raw: Optional[str]) -> Dict[str, str]:
     res = {"leetcode": "—", "hackerrank": "—", "other": "—"}
@@ -73,6 +77,7 @@ def _build_tsv_for_rows(rows, tech_name: str) -> str:
         "LeetCode",
         "HackerRank",
         "Other Coding Profiles",
+        "Decision",
     ]
     lines = ["\t".join(headers)]
     for cand, res in rows:
@@ -103,8 +108,15 @@ def _build_tsv_for_rows(rows, tech_name: str) -> str:
         langs_found = langs_found.replace("\t", " ").strip()
         git_score_str = f"{cand.gitroll_rating:.2f}" if cand.gitroll_rating else ""
         cp = parse_coding_profiles(cand.coding_profiles)
+        raw_decision = (getattr(cand, "decision", None) or "").strip().upper()
+        if raw_decision == "SELECTED":
+            decision_cell = "Accepted"
+        elif raw_decision == "REJECTED":
+            decision_cell = "Rejected"
+        else:
+            decision_cell = ""
         lines.append(
-            f"{name}\t{prof}\t{gh}\t{sal}\t{loc}\t{exp}\t{status}\t{langs_found}\t{git_score_str}\t{cp['leetcode']}\t{cp['hackerrank']}\t{cp['other']}"
+            f"{name}\t{prof}\t{gh}\t{sal}\t{loc}\t{exp}\t{status}\t{langs_found}\t{git_score_str}\t{cp['leetcode']}\t{cp['hackerrank']}\t{cp['other']}\t{decision_cell}"
         )
     return "\n".join(lines)
 
@@ -209,6 +221,27 @@ async def _paste_to_tab(page, tab_name: str, tsv_content: str):
     await asyncio.sleep(5.0)
 
 
+def schedule_sheet_sync(technology: str) -> None:
+    """Rewrite the technology Google Sheet a few seconds after the last decision change."""
+    tech = (technology or "golang").lower()
+
+    def _run():
+        try:
+            asyncio.run(export_candidates_to_google_sheet(technology=tech))
+        except Exception as exc:
+            logger.error("Background sheet sync failed for %s: %s", tech, exc)
+
+    with _sheet_sync_lock:
+        previous = _sheet_sync_timers.get(tech)
+        if previous:
+            previous.cancel()
+        timer = threading.Timer(SHEET_SYNC_DELAY_SECONDS, _run)
+        timer.daemon = True
+        _sheet_sync_timers[tech] = timer
+        timer.start()
+    logger.info("Scheduled Google Sheet sync for %s in %.0fs", tech, SHEET_SYNC_DELAY_SECONDS)
+
+
 async def export_candidates_to_google_sheet(
     technology: str = "golang",
     sheet_url: Optional[str] = None
@@ -250,13 +283,27 @@ async def export_candidates_to_google_sheet(
         tsv_data = _build_tsv_for_rows(rows, tech)
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch_persistent_context(
+            launch_kwargs = dict(
                 user_data_dir='data/browser_profile',
                 headless=True,
                 permissions=["clipboard-read", "clipboard-write"],
                 viewport={"width": 1600, "height": 950},
-                args=["--disable-blink-features=AutomationControlled"]
+                args=["--disable-blink-features=AutomationControlled"],
             )
+            browser = None
+            last_error = None
+            for channel in ("chrome", "msedge", None):
+                try:
+                    kwargs = dict(launch_kwargs)
+                    if channel:
+                        kwargs["channel"] = channel
+                    browser = await p.chromium.launch_persistent_context(**kwargs)
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning("Sheet browser channel %s failed: %s", channel or "bundled", exc)
+            if browser is None:
+                raise last_error
             page = await browser.new_page()
             await page.goto(target_sheet, wait_until="domcontentloaded", timeout=45000)
             await asyncio.sleep(5)

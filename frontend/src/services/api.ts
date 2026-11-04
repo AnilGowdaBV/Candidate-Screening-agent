@@ -119,6 +119,26 @@ export async function scanCandidateGitRoll(
   return res.json();
 }
 
+export async function setCandidateDecision(
+  candidateId: number,
+  decision: 'SELECTED' | 'REJECTED' | null,
+  technology = 'golang'
+): Promise<{ success: boolean; id: number; decision: string | null }> {
+  const res = await fetch(
+    `${API_BASE}/candidates/${candidateId}/decision?technology=${encodeURIComponent(technology)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision }),
+    }
+  );
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || 'Failed to save decision');
+  }
+  return res.json();
+}
+
 export async function exportToGoogleSheets(
   technology: string = 'javascript',
   sheetUrl?: string

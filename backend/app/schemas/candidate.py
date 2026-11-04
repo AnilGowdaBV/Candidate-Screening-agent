@@ -51,6 +51,7 @@ class CandidateRead(BaseModel):
     experience: Optional[str] = None
     coding_profiles: Optional[str] = None
     languages_found: Optional[str] = None
+    decision: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     last_seen_at: datetime

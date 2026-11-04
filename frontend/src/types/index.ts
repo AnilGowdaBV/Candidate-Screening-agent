@@ -99,6 +99,7 @@ export interface Candidate {
   experience?: string | null;
   coding_profiles?: string | null;
   languages_found?: string | null;
+  decision?: 'SELECTED' | 'REJECTED' | null;
   created_at: string;
   updated_at: string;
   last_seen_at: string;

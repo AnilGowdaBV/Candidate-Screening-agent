@@ -1,11 +1,16 @@
 """API endpoints for candidate records and filtering."""
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.repositories.candidate_repo import CandidateRepository
 from app.schemas.candidate import CandidateRead, CandidateListResponse
+
+
+class DecisionUpdate(BaseModel):
+    decision: Optional[str] = None
 
 router = APIRouter(prefix="/api/candidates", tags=["candidates"])
 
@@ -83,6 +88,36 @@ async def scan_candidate_gitroll(
     if not result.get("success") and result.get("note_status") != "NO_RATING_AVAILABLE":
         raise HTTPException(status_code=400, detail=result.get("error", "GitRoll scan failed"))
     return result
+
+
+@router.patch("/{candidate_id}/decision")
+def set_candidate_decision(
+    candidate_id: int,
+    payload: DecisionUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    technology: str = Query("golang"),
+):
+    """Save Selected or Rejected and refresh that technology's Google Sheet."""
+    from app.core.cache import cache_invalidate_prefix
+    from app.database.session import _canonical_tech
+    from app.services.sheet_export_service import schedule_sheet_sync
+
+    value = (payload.decision or "").strip().upper() or None
+    if value not in (None, "SELECTED", "REJECTED"):
+        raise HTTPException(status_code=400, detail="Decision must be SELECTED or REJECTED")
+
+    repo = CandidateRepository(db)
+    cand = repo.get_by_id(candidate_id)
+    if not cand:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    cand.decision = value
+    db.commit()
+    db.refresh(cand)
+    tech = _canonical_tech(technology)
+    cache_invalidate_prefix("candidates", tech)
+    background_tasks.add_task(schedule_sheet_sync, tech)
+    return {"success": True, "id": cand.id, "decision": cand.decision}
 
 
 @router.post("/export-google-sheets")

@@ -206,6 +206,7 @@ def test_sheet_tsv_export_includes_languages_found():
     cand.gitroll_rating = 8.5
     cand.coding_profiles = None
     cand.languages_found = "Playwright, TypeScript, JavaScript"
+    cand.decision = "SELECTED"
 
     res = MagicMock()
     res.go_status = "QA_AUTOMATION_DETECTED"
@@ -219,4 +220,6 @@ def test_sheet_tsv_export_includes_languages_found():
     assert "Languages Found" in headers
     lang_idx = headers.index("Languages Found")
     assert row[lang_idx] == "Playwright, TypeScript, JavaScript"
+    assert "Decision" in headers
+    assert row[headers.index("Decision")] == "Accepted"
 

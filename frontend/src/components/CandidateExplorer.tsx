@@ -1,25 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Users,
   Search,
   ExternalLink,
   RefreshCw,
   Github,
-  User,
   Star,
   CheckCircle2,
   AlertTriangle,
   Loader2,
   ShieldCheck,
   X,
-  RotateCcw,
   Briefcase,
   FileSpreadsheet,
   MapPin,
 } from 'lucide-react';
 import { Candidate, TechnologyKey } from '../types';
 import { TECHNOLOGIES } from './TechnologyCards';
-import { exportToGoogleSheets } from '../services/api';
+import { exportToGoogleSheets, setCandidateDecision } from '../services/api';
 
 export const TECH_SHEET_MAP: Record<string, string> = {
   golang: 'https://docs.google.com/spreadsheets/d/14zM1ftrQp-L4ntK2YViWvf4AofG1PhfScKqcVYLcEoQ/edit?gid=0#gid=0',
@@ -86,29 +84,49 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
   // Action states
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  // Recruiter Decision state (Interested / Not Interested Demo)
-  const [candidateDecisions, setCandidateDecisions] = useState<Record<number, 'INTERESTED' | 'NOT_INTERESTED'>>(() => {
-    try {
-      const saved = localStorage.getItem('candidate_decisions');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [candidateDecisions, setCandidateDecisions] = useState<Record<number, 'SELECTED' | 'REJECTED' | null>>({});
+  const [savingDecisionId, setSavingDecisionId] = useState<number | null>(null);
 
-  const handleSetDecision = (candId: number, decision: 'INTERESTED' | 'NOT_INTERESTED' | null) => {
-    setCandidateDecisions((prev) => {
-      const next = { ...prev };
-      if (decision === null) {
-        delete next[candId];
-      } else {
-        next[candId] = decision;
-      }
-      try {
-        localStorage.setItem('candidate_decisions', JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+  useEffect(() => {
+    setCandidateDecisions({});
+  }, [selectedTechnology]);
+
+  const getDecision = (cand: Candidate): 'SELECTED' | 'REJECTED' | null => {
+    if (Object.prototype.hasOwnProperty.call(candidateDecisions, cand.id)) {
+      return candidateDecisions[cand.id];
+    }
+    return cand.decision ?? null;
+  };
+
+  const handleSetDecision = async (candId: number, decision: 'SELECTED' | 'REJECTED' | null) => {
+    const previous = candidateDecisions[candId];
+    setCandidateDecisions((prev) => ({ ...prev, [candId]: decision }));
+    setSavingDecisionId(candId);
+    try {
+      await setCandidateDecision(candId, decision, selectedTechnology);
+      setToastMessage({
+        type: 'success',
+        text: decision
+          ? `Marked ${decision === 'SELECTED' ? 'Selected' : 'Rejected'}. Google Sheet will update in a few seconds.`
+          : 'Decision cleared. The sheet cell will be empty in a few seconds.',
+      });
+    } catch (err) {
+      setCandidateDecisions((prev) => {
+        const next = { ...prev };
+        if (previous === undefined) {
+          delete next[candId];
+        } else {
+          next[candId] = previous;
+        }
+        return next;
+      });
+      setToastMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Could not save decision',
+      });
+    } finally {
+      setSavingDecisionId(null);
+    }
   };
 
   const filterOptions = [
@@ -645,7 +663,6 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
             <tr>
               <th style={{ width: '45px', whiteSpace: 'nowrap' }}>ID</th>
               <th style={{ minWidth: '160px', whiteSpace: 'nowrap' }}>Candidate Name</th>
-              <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Instahyre Profile</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>GitHub URL</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Offers From</th>
               <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Current Salary</th>
@@ -663,7 +680,7 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
           <tbody>
             {filteredCandidates.length === 0 ? (
               <tr>
-                <td colSpan={15} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
+                <td colSpan={14} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
                   No candidate records match the active criteria in {currentTech.dbFileName}.
                 </td>
               </tr>
@@ -675,9 +692,11 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                   ? new Date(cand.last_seen_at).toLocaleTimeString()
                   : '—';
                 const isDetected = Boolean(latestResult?.go_status && latestResult.go_status.endsWith('_DETECTED') && !latestResult.go_status.includes('NOT'));
+                const decision = getDecision(cand);
+                const rowClass = decision === 'SELECTED' ? 'row-selected' : decision === 'REJECTED' ? 'row-rejected' : '';
 
                 return (
-                  <tr key={cand.id}>
+                  <tr key={cand.id} className={rowClass}>
                     <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', fontSize: '11px' }}>
                       #{cand.id}
                     </td>
@@ -705,32 +724,24 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                         >
                           {getInitials(cand.name)}
                         </div>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                        <a
+                          href={cand.instahyre_profile_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Open Instahyre profile"
+                          style={{
+                            fontWeight: 700,
+                            color: '#0369a1',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
                           {cand.name}
-                        </span>
+                          <ExternalLink size={11} />
+                        </a>
                       </div>
-                    </td>
-
-                    {/* Instahyre Profile Link */}
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <a
-                        href={cand.instahyre_profile_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          color: 'var(--accent-cyan)',
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                        }}
-                      >
-                        <User size={12} />
-                        <span>Profile</span>
-                        <ExternalLink size={10} />
-                      </a>
                     </td>
 
                     {/* GitHub Link */}
@@ -975,134 +986,76 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                       {checkedTime}
                     </td>
 
-                    {/* Decision (Interested / Not Interested Demo) */}
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                      {candidateDecisions[cand.id] === 'INTERESTED' ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '3px 10px',
-                              borderRadius: '5px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              background: 'rgba(16, 185, 129, 0.2)',
-                              border: '1.5px solid #10b981',
-                              color: '#6ee7b7',
-                              boxShadow: '0 0 10px rgba(16, 185, 129, 0.25)',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            <CheckCircle2 size={12} color="#10b981" />
-                            Interested
-                          </span>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <button
+                          type="button"
+                          disabled={savingDecisionId === cand.id}
+                          onClick={() => handleSetDecision(cand.id, 'SELECTED')}
+                          title="Mark as Selected"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: decision === 'SELECTED' ? '#16a34a' : 'rgba(16, 185, 129, 0.12)',
+                            border: decision === 'SELECTED' ? '1px solid #15803d' : '1px solid rgba(16, 185, 129, 0.35)',
+                            color: decision === 'SELECTED' ? '#ffffff' : '#047857',
+                            cursor: savingDecisionId === cand.id ? 'wait' : 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <CheckCircle2 size={11} />
+                          <span>Selected</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingDecisionId === cand.id}
+                          onClick={() => handleSetDecision(cand.id, 'REJECTED')}
+                          title="Mark as Rejected"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: decision === 'REJECTED' ? '#6b7280' : 'rgba(100, 116, 139, 0.12)',
+                            border: decision === 'REJECTED' ? '1px solid #4b5563' : '1px solid rgba(100, 116, 139, 0.35)',
+                            color: decision === 'REJECTED' ? '#ffffff' : '#475569',
+                            cursor: savingDecisionId === cand.id ? 'wait' : 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <X size={11} />
+                          <span>Rejected</span>
+                        </button>
+                        {decision && (
                           <button
                             type="button"
+                            disabled={savingDecisionId === cand.id}
                             onClick={() => handleSetDecision(cand.id, null)}
-                            title="Reset decision"
+                            title="Clear decision"
                             style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-dim)',
-                              cursor: 'pointer',
-                              padding: '2px',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <RotateCcw size={11} />
-                          </button>
-                        </div>
-                      ) : candidateDecisions[cand.id] === 'NOT_INTERESTED' ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '3px 10px',
-                              borderRadius: '5px',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              background: 'rgba(239, 68, 68, 0.2)',
-                              border: '1.5px solid #ef4444',
-                              color: '#fca5a5',
-                              boxShadow: '0 0 10px rgba(239, 68, 68, 0.25)',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            <X size={12} color="#ef4444" strokeWidth={2.5} />
-                            Not Interested
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleSetDecision(cand.id, null)}
-                            title="Reset decision"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-dim)',
-                              cursor: 'pointer',
-                              padding: '2px',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <RotateCcw size={11} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleSetDecision(cand.id, 'INTERESTED')}
-                            title="Mark as Interested"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
                               padding: '3px 8px',
                               borderRadius: '4px',
                               fontSize: '11px',
-                              fontWeight: 600,
-                              background: 'rgba(16, 185, 129, 0.12)',
-                              border: '1px solid rgba(16, 185, 129, 0.35)',
-                              color: '#047857',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
+                              fontWeight: 700,
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              color: '#334155',
+                              cursor: savingDecisionId === cand.id ? 'wait' : 'pointer',
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            <CheckCircle2 size={11} />
-                            <span>Interested</span>
+                            Clear
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSetDecision(cand.id, 'NOT_INTERESTED')}
-                            title="Mark as Not Interested"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              background: 'rgba(239, 68, 68, 0.12)',
-                              border: '1px solid rgba(239, 68, 68, 0.35)',
-                              color: '#b91c1c',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            <X size={11} />
-                            <span>Not Interested</span>
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

@@ -52,6 +52,7 @@ class Candidate(Base):
     experience: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     coding_profiles: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     languages_found: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    decision: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

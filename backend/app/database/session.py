@@ -147,6 +147,7 @@ def _migrate_columns(eng: Engine) -> None:
                 "experience": "VARCHAR(50)",
                 "coding_profiles": "VARCHAR(500)",
                 "languages_found": "VARCHAR(200)",
+                "decision": "VARCHAR(20)",
             }
             for col_name, col_type in new_cols.items():
                 if col_name not in existing_cols:
