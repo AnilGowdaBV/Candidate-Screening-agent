@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Generator
 from sqlalchemy import create_engine, event
+from sqlalchemy.pool import NullPool
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
 from app.core.config import get_settings
@@ -65,9 +66,7 @@ def get_engine_for_tech(technology: str = "golang") -> Engine:
             if "postgres" not in _engines:
                 _engines["postgres"] = create_engine(
                     settings.DATABASE_URL,
-                    pool_pre_ping=True,
-                    pool_size=5,
-                    max_overflow=2,
+                    poolclass=NullPool,
                     echo=False,
                     connect_args={"prepare_threshold": None},
                 )

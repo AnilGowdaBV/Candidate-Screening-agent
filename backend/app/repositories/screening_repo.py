@@ -238,44 +238,42 @@ class ScreeningRepository:
                 "errors": errors,
             }
 
-        # Global metrics across all unique candidates in database
-        candidates = list(self.db.execute(select(Candidate)).scalars().all())
-        total_candidates = len(candidates)
-
-        github_found = sum(1 for c in candidates if c.github_url and c.github_url.strip())
-        github_missing = sum(1 for c in candidates if not c.github_url or not c.github_url.strip())
-
-        go_detected = 0
-        go_not_detected = 0
-        needing_review = 0
-        notes_added = 0
-        notes_already_present = 0
-        errors = 0
-
-        for c in candidates:
-            # Latest screening result
-            if c.screening_results:
-                latest_res = c.screening_results[-1]
-                if latest_res.go_status and latest_res.go_status.endswith("_DETECTED") and "NOT" not in latest_res.go_status:
-                    go_detected += 1
-                elif latest_res.go_status and "NOT_DETECTED" in latest_res.go_status:
-                    go_not_detected += 1
-                elif latest_res.go_status in ["CHECK_INCOMPLETE", "API_RATE_LIMITED", "API_ERROR"]:
-                    needing_review += 1
-                if latest_res.error_message:
-                    errors += 1
-
-            # Latest note action
-            if c.note_actions:
-                latest_note = c.note_actions[-1]
-                if latest_note.action_status == "NOTE_ADDED":
-                    notes_added += 1
-                elif latest_note.action_status == "NOTE_ALREADY_EXISTS":
-                    notes_already_present += 1
-                elif latest_note.action_status == "NOTE_FAILED":
-                    errors += 1
-
-        processed = sum(1 for c in candidates if c.screening_results)
+        total_candidates = self.db.scalar(select(func.count()).select_from(Candidate)) or 0
+        github_found = self.db.scalar(
+            select(func.count()).select_from(Candidate).where(
+                Candidate.github_url.is_not(None),
+                Candidate.github_url != "",
+            )
+        ) or 0
+        github_missing = max(0, total_candidates - github_found)
+        processed = self.db.scalar(
+            select(func.count(distinct(ScreeningResult.candidate_id)))
+        ) or 0
+        go_detected = self.db.scalar(
+            select(func.count()).select_from(ScreeningResult).where(
+                ScreeningResult.go_status.like("%_DETECTED"),
+                ScreeningResult.go_status.not_like("%NOT_DETECTED"),
+            )
+        ) or 0
+        go_not_detected = self.db.scalar(
+            select(func.count()).select_from(ScreeningResult).where(
+                ScreeningResult.go_status.like("%NOT_DETECTED")
+            )
+        ) or 0
+        needing_review = self.db.scalar(
+            select(func.count()).select_from(ScreeningResult).where(
+                ScreeningResult.go_status.in_(["CHECK_INCOMPLETE", "API_RATE_LIMITED", "API_ERROR"])
+            )
+        ) or 0
+        notes_added = self.db.scalar(
+            select(func.count()).select_from(NoteAction).where(NoteAction.action_status == "NOTE_ADDED")
+        ) or 0
+        notes_already_present = self.db.scalar(
+            select(func.count()).select_from(NoteAction).where(NoteAction.action_status == "NOTE_ALREADY_EXISTS")
+        ) or 0
+        errors = self.db.scalar(
+            select(func.count()).select_from(NoteAction).where(NoteAction.action_status == "NOTE_FAILED")
+        ) or 0
 
         return {
             "candidates_discovered": total_candidates,
