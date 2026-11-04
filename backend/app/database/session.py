@@ -62,8 +62,6 @@ def get_engine_for_tech(technology: str = "golang") -> Engine:
     tech = _canonical_tech(technology)
     if tech not in _engines:
         if _uses_postgres():
-            from sqlalchemy import text
-
             if "postgres" not in _engines:
                 _engines["postgres"] = create_engine(
                     settings.DATABASE_URL,
@@ -73,10 +71,7 @@ def get_engine_for_tech(technology: str = "golang") -> Engine:
                     echo=False,
                     connect_args={"prepare_threshold": None},
                 )
-            admin = _engines["postgres"]
-            with admin.begin() as conn:
-                conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{tech}"'))
-            eng = admin.execution_options(schema_translate_map={None: tech})
+            eng = _engines["postgres"].execution_options(schema_translate_map={None: tech})
         elif _uses_mysql():
             url = make_url(settings.DATABASE_URL).set(database=_mysql_database_name(tech))
             eng = create_engine(url, pool_pre_ping=True, echo=False)
@@ -178,12 +173,13 @@ def _migrate_columns(eng: Engine) -> None:
 def init_db(technology: str = "golang") -> None:
     """Create all tables if they don't exist for the specified technology or all."""
     import app.models  # Ensures all models are registered with Base.metadata
-    if technology == "all":
-        for tech in TECHNOLOGY_DB_MAP:
-            eng = get_engine_for_tech(tech)
-            Base.metadata.create_all(bind=eng)
-            _migrate_columns(eng)
-    else:
-        eng = get_engine_for_tech(technology)
+    from sqlalchemy import text
+
+    techs = list(TECHNOLOGY_DB_MAP) if technology == "all" else [technology]
+    for tech in techs:
+        eng = get_engine_for_tech(tech)
+        if _uses_postgres():
+            with eng.begin() as conn:
+                conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{_canonical_tech(tech)}"'))
         Base.metadata.create_all(bind=eng)
         _migrate_columns(eng)

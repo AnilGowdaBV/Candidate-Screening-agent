@@ -25,8 +25,15 @@ async def lifespan(app: FastAPI):
     setup_logging(settings.LOG_LEVEL)
     logger.info("Starting Candidate Screening Agent backend (version %s)", __version__)
     logger.info("Environment: %s | Dry run: %s", settings.ENVIRONMENT, settings.DRY_RUN)
-    init_db("all")
-    logger.info("Databases initialized")
+
+    def _prepare_databases() -> None:
+        try:
+            init_db("all")
+            logger.info("Databases initialized")
+        except Exception:
+            logger.exception("Database initialization failed")
+
+    asyncio.get_running_loop().run_in_executor(None, _prepare_databases)
     yield
     logger.info("Shutting down Candidate Screening Agent backend")
 
