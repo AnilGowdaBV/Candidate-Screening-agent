@@ -39,7 +39,7 @@ export const App: React.FC = () => {
   const [runs, setRuns] = useState<ScreeningRun[]>([]);
 
   // Multi-Technology State
-  const [selectedTechnology, setSelectedTechnology] = useState<TechnologyKey>('golang');
+  const [selectedTechnology, setSelectedTechnology] = useState<TechnologyKey>('java');
   const [searchUrl, setSearchUrl] = useState<string>('');
   const [techCounts, setTechCounts] = useState<Record<TechnologyKey, number>>({
     golang: 177,

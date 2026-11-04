@@ -1,10 +1,10 @@
-"""Database engine, session factory, and SQLite PRAGMA configuration."""
+"""Database engine and session factory. MySQL for the app, SQLite for local tests."""
 
 from pathlib import Path
 from typing import Generator
 from sqlalchemy import create_engine, event
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, DeclarativeBase
+from sqlalchemy.engine import Engine, make_url
+from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
 from app.core.config import get_settings
 
 
@@ -37,35 +37,49 @@ _engines: dict[str, Engine] = {}
 _sessionmakers: dict[str, sessionmaker] = {}
 
 
-def get_engine_for_tech(technology: str = "golang") -> Engine:
-    tech = technology.lower() if technology else "golang"
+def _uses_mysql() -> bool:
+    return settings.DATABASE_URL.startswith("mysql")
+
+
+def _canonical_tech(technology: str | None) -> str:
+    tech = (technology or "golang").lower()
     if tech not in TECHNOLOGY_DB_MAP:
         tech = "golang"
+    if tech == "qa":
+        tech = "qa_automation"
+    return tech
 
+
+def _mysql_database_name(tech: str) -> str:
+    return f"candidate_screening_{tech}"
+
+
+def get_engine_for_tech(technology: str = "golang") -> Engine:
+    tech = _canonical_tech(technology)
     if tech not in _engines:
-        db_filename = TECHNOLOGY_DB_MAP[tech]
-        db_path = base_dir / db_filename
-        db_url = f"sqlite:///{db_path}"
-        eng = create_engine(
-            db_url,
-            connect_args={"check_same_thread": False},
-            echo=False,
-        )
+        if _uses_mysql():
+            url = make_url(settings.DATABASE_URL).set(database=_mysql_database_name(tech))
+            eng = create_engine(url, pool_pre_ping=True, echo=False)
+        else:
+            db_path = base_dir / TECHNOLOGY_DB_MAP[tech]
+            eng = create_engine(
+                f"sqlite:///{db_path}",
+                connect_args={"check_same_thread": False},
+                echo=False,
+            )
 
-        @event.listens_for(eng, "connect")
-        def set_sqlite_pragma(dbapi_connection, connection_record):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
-
+            @event.listens_for(eng, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
         _engines[tech] = eng
         _sessionmakers[tech] = sessionmaker(autocommit=False, autoflush=False, bind=eng)
-
     return _engines[tech]
 
 
 def get_sessionmaker_for_tech(technology: str = "golang") -> sessionmaker:
-    tech = technology.lower() if technology else "golang"
+    tech = _canonical_tech(technology)
     if tech not in _sessionmakers:
         get_engine_for_tech(tech)
     return _sessionmakers[tech]
@@ -88,15 +102,23 @@ def get_db(technology: str = Query("golang")) -> Generator[Session, None, None]:
         db.close()
 
 
+def _column_names(conn, table: str) -> set[str]:
+    if conn.engine.dialect.name == "mysql":
+        rows = conn.exec_driver_sql(f"SHOW COLUMNS FROM `{table}`").fetchall()
+        return {row[0] for row in rows}
+    rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+    return {row[1] for row in rows}
+
+
 def _migrate_columns(eng: Engine) -> None:
-    """Safely add any missing columns to existing SQLite tables."""
+    """Add columns that were introduced after the first schema."""
     try:
         with eng.connect() as conn:
-            cursor = conn.exec_driver_sql("PRAGMA table_info(candidates)")
-            existing_cols = {row[1] for row in cursor.fetchall()}
+            existing_cols = _column_names(conn, "candidates")
             if not existing_cols:
                 return
             new_cols = {
+                "technology": "VARCHAR(50) DEFAULT 'golang'",
                 "gitroll_rating": "FLOAT",
                 "gitroll_grade": "VARCHAR(20)",
                 "gitroll_profile_url": "VARCHAR(500)",
@@ -112,10 +134,15 @@ def _migrate_columns(eng: Engine) -> None:
                 if col_name not in existing_cols:
                     conn.exec_driver_sql(f"ALTER TABLE candidates ADD COLUMN {col_name} {col_type}")
 
-            cursor_sr = conn.exec_driver_sql("PRAGMA table_info(screening_results)")
-            existing_sr_cols = {row[1] for row in cursor_sr.fetchall()}
+            existing_sr_cols = _column_names(conn, "screening_results")
             if existing_sr_cols and "languages_found" not in existing_sr_cols:
                 conn.exec_driver_sql("ALTER TABLE screening_results ADD COLUMN languages_found VARCHAR(200)")
+            for table in ("screening_runs", "screening_results", "note_actions", "activity_events"):
+                cols = _column_names(conn, table)
+                if cols and "technology" not in cols:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN technology VARCHAR(50) DEFAULT 'golang'"
+                    )
 
             conn.commit()
     except Exception as e:

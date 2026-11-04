@@ -1,7 +1,5 @@
 """Health and system status routes."""
 
-import os
-from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app import __version__
@@ -47,12 +45,14 @@ def get_system_status():
     """Comprehensive system status with safe credential flags (zero secrets exposed)."""
     settings = get_settings()
     
-    # Check if database file directory exists/writable
-    db_path = settings.DATABASE_URL.replace("sqlite:///", "")
-    db_ready = True
+    db_ready = False
     try:
-        db_file = Path(db_path)
-        db_file.parent.mkdir(parents=True, exist_ok=True)
+        from sqlalchemy import text
+        from app.database.session import get_engine_for_tech
+
+        with get_engine_for_tech("golang").connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_ready = True
     except Exception:
         db_ready = False
 

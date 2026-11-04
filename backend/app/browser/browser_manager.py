@@ -26,7 +26,7 @@ INVALID_GH_HANDLES = {
     "site", "blog", "portfolio", "settings", "notifications", "explore",
     "topics", "trending", "collections", "events", "stars", "sponsors",
     "pulls", "issues", "marketplace", "login", "join", "enterprise", "orgs",
-    "search", "readme", "gist", "dashboard"
+    "search", "readme", "gist", "dashboard", "siddhijadhav7"
 }
 
 TRAILING_PUNCTUATION = ".,:;/)]}>'\"`\\"
@@ -52,6 +52,29 @@ def clean_and_validate_github(url: Optional[str]) -> Optional[str]:
     if handle_lower in INVALID_GH_HANDLES or len(handle) < 2:
         return None
     return f"https://github.com/{handle}"
+
+
+
+
+GENERIC_NAME_PATTERNS = {
+    "qa engineer", "automation test engineer", "senior implementation engineer",
+    "software tester", "software test engineer", "quality engineer", "quality assurance",
+    "quality analyst", "quality analysts", "software development engineer in test",
+    "sdet", "sr.software engineer", "software engineer", "software engineer qa",
+    "software qa tester", "qa lead", "test engineer", "automation engineer",
+    "lead qa", "qa automation engineer", "senior qa", "sr qa", "quality assurance as a qa",
+    "candidate", "anonymous", "not available"
+}
+
+def is_generic_title(name: Optional[str]) -> bool:
+    if not name or not isinstance(name, str):
+        return True
+    clean = name.strip().lower()
+    if clean in GENERIC_NAME_PATTERNS:
+        return True
+    if re.search(r"^(?:sr\.?|senior|lead|junior|jr\.?)?\s*(?:software|qa|test|quality|automation|implementation|sdet|analyst|engineer|tester|development)\b", clean):
+        return True
+    return False
 
 
 
@@ -83,8 +106,7 @@ class PlaywrightBrowserManager:
             user_data_dir=self.user_data_dir,
             headless=self.headless,
             viewport={"width": 1366, "height": 768},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            args=["--disable-blink-features=AutomationControlled"],
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
         )
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
 
@@ -110,8 +132,8 @@ class PlaywrightBrowserManager:
         except Exception:
             pass
 
-        # Give Cloudflare verification up to 6 seconds to complete if encountered
-        for _ in range(6):
+        # Give Cloudflare verification up to 12 seconds to complete if encountered
+        for _ in range(12):
             title = (await self.page.title()).lower()
             if "just a moment" not in title and "security verification" not in title:
                 break
@@ -200,8 +222,8 @@ class PlaywrightBrowserManager:
         except Exception:
             pass
 
-        # Give Cloudflare verification up to 6 seconds to complete if encountered
-        for _ in range(6):
+        # Give Cloudflare verification up to 12 seconds to complete if encountered
+        for _ in range(12):
             title = (await self.page.title()).lower()
             if "just a moment" not in title and "security verification" not in title:
                 break
@@ -276,13 +298,37 @@ class PlaywrightBrowserManager:
             if cand_id:
                 seen_ids.add(cand_id)
 
-            # Extract name
-            name = f"Candidate #{idx+1}"
-            name_el = await row.query_selector(SEARCH_SELECTORS["candidate_name"])
-            if name_el:
-                name_text = (await name_el.inner_text()).strip()
-                if name_text:
-                    name = name_text
+            # Extract name: prioritize Angular scope model, then card DOM, sanitize generic titles
+            name = None
+            try:
+                scope_cand_name = await self.page.evaluate("""(el) => {
+                    try {
+                        if (window.angular) {
+                            const sc = angular.element(el).scope();
+                            const cand = sc ? (sc.cand || sc.candidate || sc.c) : null;
+                            if (cand) {
+                                if (cand.user && cand.user.full_name) return cand.user.full_name.trim();
+                                if (cand.name) return cand.name.trim();
+                                if (cand.display_name) return cand.display_name.trim();
+                            }
+                        }
+                    } catch(e) {}
+                    return null;
+                }""", row)
+                if scope_cand_name and not is_generic_title(scope_cand_name):
+                    name = scope_cand_name
+            except Exception:
+                pass
+
+            if not name:
+                name_el = await row.query_selector(SEARCH_SELECTORS["candidate_name"])
+                if name_el:
+                    name_text = (await name_el.inner_text()).strip()
+                    if name_text and not is_generic_title(name_text):
+                        name = name_text
+
+            if not name:
+                name = f"Candidate #{cand_id if cand_id else idx+1}"
 
             full_url = f"{INSTAHYRE_BASE_URL}/candidate/{cand_id}/" if cand_id else f"{self.page.url}#candidate-{idx+1}"
 
@@ -472,15 +518,18 @@ class PlaywrightBrowserManager:
     async def inspect_candidate_profile(self, profile_url: str, card_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Open a candidate profile drawer and locate their GitHub profile URL, coding profiles, and metadata.
-        Thoroughly searches Angular scopes, top social icons, rendered resume HTML, iframes, and fallback rows.
+        Strictly isolated to current candidate; never bleeds or reuses data from other candidates.
         """
         assert self.page is not None
         row_idx = card_info.get("row_index") if card_info else None
-        ext_id = card_info.get("external_id") if card_info else None
+        ext_id = str(card_info.get("external_id") or "").strip() or None
         cand_name = card_info.get("name") if card_info else "Candidate"
         card_cached_gh = card_info.get("github_url") if card_info else None
 
         logger.info("Inspecting candidate profile: %s (%s)", cand_name, profile_url)
+
+        # 1. Cleanly close and wipe any prior modal before opening
+        await self.close_candidate_modal()
 
         # Locate candidate row on current search page
         row = None
@@ -491,80 +540,142 @@ class PlaywrightBrowserManager:
             if row_idx < len(rows):
                 row = rows[row_idx]
 
-        # Click View profile button to open drawer if row found
         modal = self.page.locator(".application-modal-wrap, #resume-modal-block").first
+        modal_opened = False
         if row:
-            view_btn = await row.query_selector('.button-download-resume, a:has-text("View profile"), button:has-text("View profile"), [ng-click*="viewResume"], [ng-click*="showResume"], [ng-click*="openResume"], .view-profile')
-            if view_btn:
-                await view_btn.scroll_into_view_if_needed()
-                await view_btn.click(force=True)
-                await asyncio.sleep(1.5)
-            # Fallback to candidate name click if modal not open
-            if await modal.count() == 0 or not await modal.is_visible():
-                name_link = await row.query_selector(SEARCH_SELECTORS["candidate_name"])
-                if name_link:
-                    await name_link.click(force=True)
+            try:
+                view_btn = await row.query_selector('.button-download-resume, a:has-text("View profile"), button:has-text("View profile"), [ng-click*="viewResume"], [ng-click*="showResume"], [ng-click*="openResume"], .view-profile, [ng-click*="Candidate"]')
+                if view_btn:
+                    try:
+                        await view_btn.scroll_into_view_if_needed(timeout=3000)
+                    except Exception:
+                        pass
+                    try:
+                        await view_btn.click(force=True, timeout=3000)
+                    except Exception:
+                        pass
                     await asyncio.sleep(1.5)
-        elif profile_url and profile_url != self.page.url:
-            await self.page.goto(profile_url, wait_until="domcontentloaded", timeout=20000)
-            await asyncio.sleep(2)
+                if await modal.count() > 0 and await modal.is_visible():
+                    modal_opened = True
+                else:
+                    name_link = await row.query_selector(SEARCH_SELECTORS["candidate_name"])
+                    if name_link:
+                        try:
+                            await name_link.click(force=True, timeout=3000)
+                        except Exception:
+                            pass
+                        await asyncio.sleep(1.5)
+                    if await modal.count() > 0 and await modal.is_visible():
+                        modal_opened = True
+            except Exception as click_err:
+                logger.warning("Error clicking candidate card: %s", click_err)
 
-        # Wait up to 4.5s for modal and resume content or Angular scope to populate
-        for _ in range(9):
-            loaded = await self.page.evaluate("""() => {
+        # Fallback to direct navigation only if modal did not open from card
+        if not modal_opened and profile_url and profile_url != self.page.url:
+            logger.info("Modal drawer not open from card click. Navigating directly to profile: %s", profile_url)
+            try:
+                await self.page.goto(profile_url, wait_until="domcontentloaded", timeout=25000)
+                await asyncio.sleep(2.5)
+            except Exception as nav_e:
+                logger.warning("Direct profile navigation warning: %s", nav_e)
+
+        # Wait for Cloudflare if verification screen is shown
+        for _ in range(12):
+            title = (await self.page.title()).lower()
+            if "just a moment" not in title and "security verification" not in title:
+                break
+            await asyncio.sleep(1)
+
+        # Wait up to 8s for modal content to load and verify it belongs to THIS candidate
+        for _ in range(16):
+            loaded = await self.page.evaluate("""(targetId) => {
                 const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
                 if (!m) return false;
+                const text = m.innerText || '';
+                if (text.includes('This candidate is no longer available')) {
+                    return true;
+                }
                 if (window.angular) {
                     try {
                         const sc = angular.element(m).scope();
-                        if (sc && (sc.candidate || sc.resumeCandidate || sc.resume_candidate)) return true;
+                        const cand = sc ? (sc.candidate || sc.resumeCandidate || sc.cand) : null;
+                        if (cand) {
+                            if (targetId && cand.id && String(cand.id) !== String(targetId)) {
+                                return false; // Stale previous candidate
+                            }
+                            if (cand.id || cand.user || cand.display_name) {
+                                const r = document.querySelector('#resume-html-container, #resume-tab, .resume-container');
+                                if (r && !r.innerText.includes('Hold on, loading')) return true;
+                            }
+                        }
                     } catch(e) {}
                 }
-                const r = document.querySelector('#resume-html-container, #resume-tab, .resume-container, .candidate-links');
-                if (r && (r.innerText.trim().length > 30 || r.querySelectorAll('a').length > 0)) return true;
-                return m.innerText.trim().length > 80;
-            }""")
+                const r = document.querySelector('#resume-html-container, #resume-tab, .resume-container');
+                if (r && !r.innerText.includes('Hold on, loading') && (r.innerText.trim().length > 30 || r.querySelectorAll('a').length > 0)) {
+                    return true;
+                }
+                return false;
+            }""", ext_id)
             if loaded:
                 break
             await asyncio.sleep(0.5)
 
         # Extract candidate real name if available in drawer / Angular scope
         name = cand_name
-        modal = await self.page.query_selector("#resume-modal-block, .application-modal-wrap")
         try:
-            extracted_name = await self.page.evaluate("""() => {
+            extracted_name = await self.page.evaluate("""(targetId) => {
                 try {
                     const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
                     if (m && window.angular) {
                         const sc = angular.element(m).scope();
-                        const cand = sc.candidate || sc.resumeCandidate || sc.resume_candidate || sc.resumecandidate;
-                        if (cand && cand.user && cand.user.full_name) {
-                            return cand.user.full_name.trim();
+                        const cand = sc ? (sc.candidate || sc.resumeCandidate || sc.cand) : null;
+                        if (cand) {
+                            if (targetId && cand.id && String(cand.id) !== String(targetId)) return null;
+                            if (cand.user && cand.user.full_name) return cand.user.full_name.trim();
+                            if (cand.name) return cand.name.trim();
+                            if (cand.display_name) return cand.display_name.trim();
                         }
-                        if (cand && cand.display_name) return cand.display_name.trim();
                     }
                 } catch(e) {}
-                const el = document.querySelector('#resume-modal-block .candidate-name .readonly-field, #resume-modal-block .name-row .readonly-field, #resume-modal-block #name, #resume-modal-block .candidate-name');
-                return el ? el.innerText.trim() : null;
-            }""")
-            if extracted_name and extracted_name not in ("Software Tester", "Automation QA", "Candidate") and len(extracted_name) > 2:
+                return null;
+            }""", ext_id)
+            if extracted_name and not is_generic_title(extracted_name):
                 name = extracted_name
         except Exception:
             pass
 
-        if (not name or name in ("Software Tester", "Automation QA", "Candidate")) and modal:
-            name_el = await modal.query_selector(PROFILE_SELECTORS["name"])
-            if name_el:
-                name_text = (await name_el.inner_text()).strip()
-                if name_text and name_text not in ("Software Tester", "Automation QA", "Candidate"):
-                    name = name_text
+        # If name is still generic, attempt extraction from top lines of rendered resume
+        if is_generic_title(name):
+            try:
+                top_resume_name = await self.page.evaluate("""() => {
+                    const r = document.querySelector('#resume-html-container, #resume-tab, .resume-container');
+                    if (!r) return null;
+                    const lines = (r.innerText || '').split('\n').map(l => l.trim()).filter(Boolean);
+                    for (const l of lines.slice(0, 4)) {
+                        if (/^[A-Za-z\\s\\.]{3,35}$/.test(l) && l.split(/\\s+/).length >= 1 && l.split(/\\s+/).length <= 4) {
+                            const lower = l.toLowerCase();
+                            if (!lower.includes('resume') && !lower.includes('curriculum') && !lower.includes('profile') && !lower.includes('page')) {
+                                return l;
+                            }
+                        }
+                    }
+                    return null;
+                }""")
+                if top_resume_name and not is_generic_title(top_resume_name):
+                    name = top_resume_name
+            except Exception:
+                pass
 
-        # Search for GitHub link across all possible sources
+        # If still generic, give a clear candidate identifier
+        if is_generic_title(name):
+            name = f"Candidate #{ext_id}" if ext_id else cand_name
+
+        # Search for GitHub link strictly isolated to THIS candidate:
         github_url = None
 
-        # 1. Deep search in Angular Scope (candidate models, social accounts, nested properties)
+        # 1. Search in THIS candidate's Angular Scope (verified targetId)
         try:
-            scope_gh = await self.page.evaluate("""() => {
+            scope_gh = await self.page.evaluate("""(targetId) => {
                 try {
                     function findGh(obj, depth = 0) {
                         if (!obj || depth > 5) return null;
@@ -588,167 +699,92 @@ class PlaywrightBrowserManager:
                         return null;
                     }
 
-                    const selectors = ['#resume-modal-block', '.application-modal-wrap', '.candidate-profile', '.candidate-links', '.modal-dialog', 'body'];
-                    for (const sel of selectors) {
-                        const el = document.querySelector(sel);
-                        if (el && window.angular) {
-                            const sc = angular.element(el).scope();
-                            if (sc) {
-                                const cand = sc.candidate || sc.resumeCandidate || sc.resume_candidate || sc.resumecandidate || sc.cand || sc.candidateData;
-                                if (cand) {
-                                    if (cand.social_accounts) {
-                                        const soc = cand.social_accounts;
-                                        if (typeof soc === 'object' && !Array.isArray(soc)) {
-                                            if (soc.github) return soc.github;
-                                            if (soc.fc_github_url) return soc.fc_github_url;
-                                        } else if (Array.isArray(soc)) {
-                                            for (const s of soc) {
-                                                const u = s.url || s.link || s.profile_url || s.github || '';
-                                                if (u && u.toLowerCase().includes('github.com')) return u;
-                                            }
-                                        }
+                    const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
+                    if (m && window.angular) {
+                        const sc = angular.element(m).scope();
+                        const cand = sc ? (sc.candidate || sc.resumeCandidate || sc.cand) : null;
+                        if (cand) {
+                            if (targetId && cand.id && String(cand.id) !== String(targetId)) return null;
+                            if (cand.social_accounts) {
+                                const soc = cand.social_accounts;
+                                if (typeof soc === 'object' && !Array.isArray(soc)) {
+                                    if (soc.github) return soc.github;
+                                    if (soc.fc_github_url) return soc.fc_github_url;
+                                } else if (Array.isArray(soc)) {
+                                    for (const s of soc) {
+                                        const u = s.url || s.link || s.profile_url || s.github || '';
+                                        if (u && u.toLowerCase().includes('github.com')) return u;
                                     }
-                                    if (cand.fc_github_url) return cand.fc_github_url;
-                                    if (cand.github_url) return cand.github_url;
-                                    if (cand.github) return cand.github;
-                                    if (cand.social_links) {
-                                        for (const sl of Object.values(cand.social_links)) {
-                                            if (typeof sl === 'string' && sl.toLowerCase().includes('github.com')) return sl;
-                                        }
-                                    }
-                                    const deepFound = findGh(cand);
-                                    if (deepFound) return deepFound;
                                 }
                             }
+                            if (cand.fc_github_url) return cand.fc_github_url;
+                            if (cand.github_url) return cand.github_url;
+                            if (cand.github) return cand.github;
+                            return findGh(cand);
                         }
                     }
                 } catch(e) {}
                 return null;
-            }""")
+            }""", ext_id)
             if scope_gh:
                 github_url = clean_and_validate_github(scope_gh)
         except Exception:
             pass
 
-        # 2. Check top social icons and modal DOM elements
+        # 2. Check modal links and text (social icons in header and resume text)
         if not github_url:
             try:
-                dom_gh = await self.page.evaluate("""() => {
-                    const links = Array.from(document.querySelectorAll(
-                        '.candidate-links a, a[ng-href*="github"], a[href*="github.com"], ' +
-                        'a[title*="github" i], a[data-original-title*="github" i], a[aria-label*="github" i], ' +
-                        '.candidate-social-links a, .icons-row a, .social-icons a, .social-links a, ' +
-                        '#resume-modal-block a, .application-modal-wrap a'
-                    ));
-                    for (const a of links) {
-                        const h = a.getAttribute('ng-href') || a.href || a.getAttribute('href') || a.getAttribute('data-url') || a.getAttribute('data-link') || a.getAttribute('title') || a.innerText || '';
-                        if (h && h.toLowerCase().includes('github.com')) return h;
-                    }
-                    return null;
-                }""")
-                if dom_gh:
-                    github_url = clean_and_validate_github(dom_gh)
-            except Exception:
-                pass
-
-        # 3. Check rendered resume container and text (#resume-html-container, #resume-tab, etc.)
-        if not github_url:
-            try:
-                resume_data = await self.page.evaluate("""() => {
-                    const rContainer = document.querySelector(
-                        '#resume-html-container, #resume-tab, .resume-container, .resume-body, .resume-view, .resume-viewer, ' +
-                        '[ng-bind-html*="resume"], .pdf-viewer, .text-layer, #resume-modal-block, .application-modal-wrap'
-                    );
-                    if (!rContainer) return { text: '', links: [] };
-                    const links = Array.from(rContainer.querySelectorAll('a'))
-                        .map(a => a.href || a.getAttribute('href') || a.getAttribute('ng-href') || a.innerText || '')
-                        .filter(h => h && h.toLowerCase().includes('github.com'));
-                    return { text: rContainer.innerText || '', links: links };
-                }""")
-                for l in resume_data.get("links", []):
-                    valid_url = clean_and_validate_github(l)
-                    if valid_url:
-                        github_url = valid_url
-                        break
-                if not github_url and resume_data.get("text"):
-                    gh_matches = re.findall(r"(?:https?://)?(?:www\.)?github\.com/[a-zA-Z0-9_\-\.\/]+", resume_data["text"], re.IGNORECASE)
-                    for m in gh_matches:
-                        valid_url = clean_and_validate_github(m)
-                        if valid_url:
-                            github_url = valid_url
-                            break
-            except Exception:
-                pass
-
-        # 4. Check Playwright frames / iframes (resumes embedded inside iframe or document viewer)
-        if not github_url:
-            try:
-                for frame in self.page.frames:
-                    if frame == self.page.main_frame:
-                        continue
-                    try:
-                        frame_data = await frame.evaluate("""() => {
-                            const links = Array.from(document.querySelectorAll('a'))
-                                .map(a => a.href || a.getAttribute('href') || a.getAttribute('ng-href') || a.innerText || '')
-                                .filter(h => h && h.toLowerCase().includes('github.com'));
-                            return {
-                                links: links,
-                                text: document.body ? document.body.innerText : ''
-                            };
-                        }""")
-                        for l in frame_data.get("links", []):
-                            val = clean_and_validate_github(l)
-                            if val:
-                                github_url = val
-                                break
-                        if not github_url and frame_data.get("text") and "github.com" in frame_data["text"].lower():
-                            gh_matches = re.findall(r"(?:https?://)?(?:www\.)?github\.com/[a-zA-Z0-9_\-\.\/]+", frame_data["text"], re.IGNORECASE)
-                            for m in gh_matches:
-                                val = clean_and_validate_github(m)
-                                if val:
-                                    github_url = val
-                                    break
-                        if github_url:
-                            break
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-        # 5. Check entire modal innerText fallback
-        if not github_url:
-            try:
-                modal_text = await self.page.evaluate("""() => {
+                modal_gh = await self.page.evaluate("""(targetId) => {
                     const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
-                    return m ? m.innerText : (document.body ? document.body.innerText : '');
-                }""")
-                gh_matches = re.findall(r"(?:https?://)?(?:www\.)?github\.com/[a-zA-Z0-9_\-\.\/]+", modal_text, re.IGNORECASE)
-                for m in gh_matches:
-                    valid_url = clean_and_validate_github(m)
-                    if valid_url:
-                        github_url = valid_url
-                        break
+                    if (!m) return null;
+                    if (window.angular && targetId) {
+                        try {
+                            const sc = angular.element(m).scope();
+                            const cand = sc ? (sc.candidate || sc.resumeCandidate || sc.cand) : null;
+                            if (cand && cand.id && String(cand.id) !== String(targetId)) return null;
+                        } catch(e) {}
+                    }
+                    const links = Array.from(m.querySelectorAll('a'))
+                        .map(a => a.getAttribute('ng-href') || a.href || a.getAttribute('title') || a.getAttribute('href') || '')
+                        .filter(h => h && h.toLowerCase().includes('github.com'));
+                    if (links.length > 0) return links[0];
+                    const text = m.innerText || '';
+                    const ghMatches = text.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/[a-zA-Z0-9_\-\.\/]+/gi);
+                    if (ghMatches && ghMatches.length > 0) return ghMatches[0];
+                    return null;
+                }""", ext_id)
+                if modal_gh:
+                    github_url = clean_and_validate_github(modal_gh)
             except Exception:
                 pass
 
-        # 6. Fallback to row on search page or card cache
+        # 3. Check candidate row on search page (strictly isolated to row element)
+        if not github_url and row:
+            try:
+                row_gh = await self.page.evaluate("""(rowEl) => {
+                    if (!rowEl) return null;
+                    const links = Array.from(rowEl.querySelectorAll('a'))
+                        .map(a => a.href || a.getAttribute('href') || a.getAttribute('ng-href') || a.getAttribute('title') || '')
+                        .filter(h => h && h.toLowerCase().includes('github.com'));
+                    if (links.length > 0) return links[0];
+                    return null;
+                }""", row)
+                if row_gh:
+                    github_url = clean_and_validate_github(row_gh)
+            except Exception:
+                pass
+
         if not github_url and card_cached_gh:
             github_url = clean_and_validate_github(card_cached_gh)
 
-        if not github_url and row:
-            row_gh_links = await row.query_selector_all('a[href*="github.com"], a[ng-href*="github.com"], a[title*="github" i], a[data-original-title*="github" i]')
-            for rgl in row_gh_links:
-                href = (await rgl.get_attribute("ng-href")) or (await rgl.get_attribute("href")) or (await rgl.get_attribute("title"))
-                valid_url = clean_and_validate_github(href)
-                if valid_url:
-                    github_url = valid_url
-                    break
-
         # Extract current salary
         current_salary = card_info.get("current_salary") if card_info else None
-        if not current_salary and modal:
+        if not current_salary:
             try:
-                m_text = await modal.inner_text()
+                m_text = await self.page.evaluate("""() => {
+                    const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
+                    return m ? m.innerText : '';
+                }""")
                 sal_match = re.search(r"(?:Current\s*salary|Salary|CTC)\s*[:\-]?\s*(?:₹|Rs\.?)?\s*([\d\.]+\s*(?:lpa|LPA|L|lakhs?))", m_text, re.IGNORECASE)
                 if sal_match:
                     val = sal_match.group(1).strip().upper()
@@ -760,49 +796,57 @@ class PlaywrightBrowserManager:
 
         # Extract location
         location = card_info.get("location") if card_info else None
-        if not location and modal:
+        if not location:
             try:
-                loc_el = await modal.query_selector(".location-info-field [ng-hide*='editing_location'], .location-info-field span:not(.info-label)")
-                if loc_el:
-                    loc_txt = (await loc_el.inner_text()).replace("Location:", "").strip()
-                    if loc_txt:
-                        location = loc_txt
-                if not location:
-                    m_text = await modal.inner_text()
-                    loc_match = re.search(r"Location\s*:\s*([^\n\r\t<]+?)(?:\s{2,}|Experience:|Notice|Current|<|$)", m_text, re.IGNORECASE)
-                    if loc_match:
-                        location = loc_match.group(1).strip()
+                m_text = await self.page.evaluate("""() => {
+                    const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
+                    return m ? m.innerText : '';
+                }""")
+                loc_match = re.search(r"Location\s*:\s*([^\n\r\t<]+?)(?:\s{2,}|Experience:|Notice|Current|<|$)", m_text, re.IGNORECASE)
+                if loc_match:
+                    location = loc_match.group(1).strip()
             except Exception:
                 pass
 
         experience = card_info.get("experience") if card_info else None
-        if not experience and modal:
+        if not experience:
             try:
-                exp_el = await modal.query_selector("[ng-hide*='editing_experience']")
-                if exp_el:
-                    exp_txt = (await exp_el.inner_text()).replace("Experience:", "").strip()
-                    if exp_txt:
-                        experience = exp_txt
-                if not experience:
-                    m_text = await modal.inner_text()
-                    exp_match = re.search(r"Experience\s*:\s*([0-9.]+\s*(?:years?|yrs?|months?)?)", m_text, re.IGNORECASE)
-                    if exp_match:
-                        experience = re.sub(r"\s+", " ", exp_match.group(1)).strip()
+                m_text = await self.page.evaluate("""() => {
+                    const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
+                    return m ? m.innerText : '';
+                }""")
+                exp_match = re.search(r"Experience\s*:\s*([0-9.]+\s*(?:years?|yrs?|months?)?)", m_text, re.IGNORECASE)
+                if exp_match:
+                    experience = re.sub(r"\s+", " ", exp_match.group(1)).strip()
             except Exception:
                 pass
+
 
         # Check for Coding Platforms across all domains (LeetCode, HackerRank, CodeChef, Codeforces, GeeksforGeeks, ICPC)
         coding_parts = []
         if modal:
             try:
-                m_links = await modal.query_selector_all("a")
-                hrefs = []
-                for l in m_links:
-                    h = await l.get_attribute("href")
-                    if h:
-                        hrefs.append(h.strip())
-
-                modal_text = await modal.inner_text()
+                coding_data = await self.page.evaluate('''() => {
+                    const m = document.querySelector('#resume-modal-block, .application-modal-wrap');
+                    if (!m) return { hrefs: [], text: '' };
+                    const links = Array.from(m.querySelectorAll('a'))
+                        .map(a => a.href || a.getAttribute('ng-href') || '')
+                        .filter(Boolean);
+                    if (window.angular) {
+                        try {
+                            const sc = angular.element(m).scope();
+                            const cand = sc ? (sc.candidate || sc.resumeCandidate || sc.cand) : null;
+                            if (cand && cand.social_accounts) {
+                                for (const val of Object.values(cand.social_accounts)) {
+                                    if (typeof val === 'string' && val.startsWith('http')) links.push(val);
+                                }
+                            }
+                        } catch(e) {}
+                    }
+                    return { hrefs: links, text: m.innerText || '' };
+                }''')
+                hrefs = coding_data.get("hrefs", []) if coding_data else []
+                modal_text = coding_data.get("text", "") if coding_data else ""
 
                 # LeetCode
                 lc_link = next((h for h in hrefs if "leetcode.com" in h.lower()), None)
@@ -1141,59 +1185,55 @@ class PlaywrightBrowserManager:
             return "NOTE_FAILED", str(exc)
 
     async def close_candidate_modal(self) -> None:
-        """Close candidate profile drawer/modal to restore search view for next candidate."""
+        """Close candidate profile drawer/modal and cleanly erase cached resume content to prevent leakage."""
         if not self.page:
             return
         try:
+            # If direct navigation to /candidate/ page was used, go back to restore search page
+            if "/candidate/" in self.page.url and "/search/results" not in self.page.url:
+                try:
+                    await self.page.go_back(wait_until="domcontentloaded", timeout=20000)
+                    await asyncio.sleep(1.5)
+                    await self.ensure_search_job_selected()
+                    return
+                except Exception as gb_e:
+                    logger.warning("go_back warning: %s", gb_e)
+
+            # 1. Cleanly clear modal DOM and Angular scope first
+            await self.page.evaluate("""() => {
+                const r = document.querySelector('#resume-html-container, #resume-tab, .resume-container');
+                if (r) r.innerHTML = '';
+                const soc = document.querySelectorAll('.candidate-social-links, .social-links, .candidate-profile-header, .application-modal-header');
+                for (const s of soc) { s.innerHTML = ''; }
+                const m = document.querySelector('.application-modal-wrap, #resume-modal-block');
+                if (m && window.angular) {
+                    try {
+                        const scope = angular.element(m).scope();
+                        if (scope) {
+                            scope.candidate = null;
+                            scope.resumeCandidate = null;
+                            scope.resume_candidate = null;
+                            scope.resumecandidate = null;
+                            scope.cand = null;
+                            if (typeof scope.closeModal === 'function') scope.closeModal();
+                            else if (typeof scope.$dismiss === 'function') scope.$dismiss();
+                            else if (typeof scope.$close === 'function') scope.$close();
+                            try { scope.$apply(); } catch(e) {}
+                        }
+                    } catch (e) {}
+                }
+            }""")
+
+            # 2. Click close buttons and press Escape
             modal = self.page.locator(".application-modal-wrap, #resume-modal-block").first
             if await modal.count() > 0 and await modal.is_visible():
                 close_btn = modal.locator(".application-modal-close, .modal-header .close, button.close, [ng-click*='closeModal'], [ng-click*='close'], .fa-times, .fa-close").first
                 if await close_btn.count() > 0:
                     try:
-                        await close_btn.click(force=True, timeout=2000)
+                        await close_btn.click(force=True, timeout=1500)
                     except Exception:
                         pass
-
                 await self.page.keyboard.press("Escape")
-                await asyncio.sleep(0.5)
-
-                # Angular scope closeModal
-                await self.page.evaluate("""() => {
-                    const modal = document.querySelector('.application-modal-wrap, #resume-modal-block');
-                    if (modal && window.angular) {
-                        try {
-                            const scope = angular.element(modal).scope();
-                            if (scope) {
-                                if (typeof scope.closeModal === 'function') scope.closeModal();
-                                else if (typeof scope.$dismiss === 'function') scope.$dismiss();
-                                else if (typeof scope.$close === 'function') scope.$close();
-                                scope.$apply();
-                            }
-                        } catch (e) {}
-                    }
-                }""")
-                await asyncio.sleep(0.5)
-
-                # Dismiss abuse limit modal or backdrop if visible
-                try:
-                    await self.page.evaluate("""() => {
-                        const abuse = document.querySelector('.abuse-limit-activated-container, .abuse-limit-container');
-                        if (abuse) {
-                            const btn = abuse.querySelector('.close, button, .modal-close');
-                            if (btn) btn.click();
-                        }
-                    }""")
-                    await self.page.keyboard.press("Escape")
-                except Exception:
-                    pass
-
-                if await modal.is_visible():
-                    backdrop = self.page.locator(".application-modal-backdrop, .modal-backdrop").first
-                    if await backdrop.count() > 0:
-                        try:
-                            await backdrop.click(force=True, timeout=2000)
-                        except Exception:
-                            pass
 
             await asyncio.sleep(0.5)
         except Exception as exc:

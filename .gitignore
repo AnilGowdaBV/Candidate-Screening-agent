@@ -29,6 +29,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Secrets
+.env
+backend/.env
+
 # IDE & OS
 .vscode/
 .idea/

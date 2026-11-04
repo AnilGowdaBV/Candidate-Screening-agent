@@ -22,6 +22,7 @@ class ScreeningRun(Base):
     __tablename__ = "screening_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    technology: Mapped[str] = mapped_column(String(50), default="golang", nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(50), default="IDLE", nullable=False, index=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

@@ -3,7 +3,8 @@
 import asyncio
 import json
 from typing import AsyncGenerator, Dict, Any, List, Optional
-from app.database.session import SessionLocal
+from app.database.session import SessionLocal, get_sessionmaker_for_tech
+from app.core.state import state_manager
 from app.repositories.screening_repo import ScreeningRepository
 from app.core.logging import get_logger
 
@@ -45,7 +46,9 @@ class EventBroker:
         """
         # 1. Persist to SQLite
         try:
-            db = SessionLocal()
+            tech = state_manager.active_technology or "qa_automation"
+            sm = get_sessionmaker_for_tech(tech)
+            db = sm()
             try:
                 repo = ScreeningRepository(db)
                 repo.record_activity_event(

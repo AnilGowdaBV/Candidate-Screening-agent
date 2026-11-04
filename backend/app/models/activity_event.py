@@ -21,6 +21,7 @@ class ActivityEvent(Base):
     __tablename__ = "activity_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    technology: Mapped[str] = mapped_column(String(50), default="golang", nullable=False, index=True)
     run_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("screening_runs.id", ondelete="SET NULL"), nullable=True, index=True
     )

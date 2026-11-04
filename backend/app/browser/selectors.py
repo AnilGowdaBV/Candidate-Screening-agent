@@ -19,7 +19,7 @@ SEARCH_SELECTORS = {
     "search_container": '#candidate-search-results, .candidates-list, .search-results, .list-view',
     "candidate_cards": '.candidate-row, .ats-resume-profile',
     "candidate_link": '.candidate-row, a[href*="/candidate/"]',
-    "candidate_name": '.candidate-name .readonly-field, .candidate-name, h3, h4',
+    "candidate_name": '.candidate-name .readonly-field, .candidate-name, .name-row',
     "view_profile_button": '.button-download-resume, a:has-text("View profile")',
     "pagination_next": 'a:has-text("Next"), button:has-text("Next"), li.next a, a[rel="next"]',
     "no_results": ':has-text("No candidates found"), :has-text("No results")',
@@ -27,7 +27,7 @@ SEARCH_SELECTORS = {
 
 # Candidate Profile Selectors
 PROFILE_SELECTORS = {
-    "name": '.candidate-name .readonly-field, .candidate-name, h1, h2, .name',
+    "name": '.candidate-name .readonly-field, .candidate-name, .name-row, #name',
     "external_id_meta": '[data-candidate-id], [data-external-id], input[name="candidate_id"]',
     "github_link": 'a[href*="github.com"]',
     "social_links_container": '.social-links, .links-section, .candidate-links, .profile-links',

@@ -21,6 +21,7 @@ class ScreeningResult(Base):
     __tablename__ = "screening_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    technology: Mapped[str] = mapped_column(String(50), default="golang", nullable=False, index=True)
     candidate_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True
     )

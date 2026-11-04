@@ -21,13 +21,14 @@ class NoteAction(Base):
     __tablename__ = "note_actions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    technology: Mapped[str] = mapped_column(String(50), default="golang", nullable=False, index=True)
     candidate_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True
     )
     run_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("screening_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    note_text: Mapped[str] = mapped_column(String(255), nullable=False)
+    note_text: Mapped[str] = mapped_column(Text, nullable=False)
     action_status: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True
     )  # NOTE_ADDED, NOTE_ALREADY_EXISTS, NOTE_FAILED, NOTE_OUTCOME_UNKNOWN, SKIPPED

@@ -96,7 +96,7 @@ async def start_screening(payload: Optional[StartRunRequest] = None):
             config_snapshot["instahyre_search_url"] = custom_search_url
         run = repo.create_run(configuration_snapshot=json.dumps(config_snapshot))
         run_id = run.id
-        state_manager.start_run(run_id=run_id)
+        state_manager.start_run(run_id=run_id, technology=tech)
         repo.record_activity_event(
             run_id=run_id,
             event_type="RUN_STARTED",

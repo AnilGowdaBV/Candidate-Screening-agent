@@ -222,10 +222,16 @@ class ScreeningOrchestrator:
                 if card.get("experience") and not candidate.experience:
                     cand_repo.update_experience(candidate.id, card.get("experience"))
 
-                # Only fast-skip if candidate was already processed within this exact current run
+                # Skip candidate if already screened previously across any run
                 prior_result = screen_repo.find_latest_screening_result(candidate.id)
-                if prior_result and prior_result.run_id == run_id:
-                    logger.info("Candidate %s (#%d) already screened in this run. Skipping duplicate card.", cand_name, candidate.id)
+                if prior_result and prior_result.go_status not in ("CHECK_INCOMPLETE", "API_RATE_LIMITED", "API_ERROR"):
+                    logger.info("Candidate %s (#%d) already screened previously (%s). Skipping duplicate profile.", cand_name, candidate.id, prior_result.go_status)
+                    await event_broker.emit(
+                        event_type="CANDIDATE_SKIPPED_DUPLICATE",
+                        message=f"{cand_name} was already screened earlier ({prior_result.go_status}). Skipping duplicate.",
+                        run_id=run_id,
+                        candidate_id=candidate.id,
+                    )
                     continue
 
                 await event_broker.emit(
