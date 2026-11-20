@@ -8,6 +8,7 @@ import {
   ComparisonResolveResult,
 } from '../types';
 import { buildMultiComparisonPlan } from '../utils/comparisonPlan';
+import { buildRecentSearchesFromRuns } from '../utils/recentSearchesFallback';
 
 const configuredApi = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
 export const API_BASE = configuredApi ? `${configuredApi}/api` : "/api";
@@ -67,11 +68,26 @@ export async function fetchRuns(limit = 20, technology = 'golang'): Promise<Scre
 }
 
 export async function fetchRecentSearches(limit = 5, technology = 'golang'): Promise<RecentSearchSummary[]> {
-  const res = await fetch(
-    `${API_BASE}/recent-searches?limit=${limit}&technology=${encodeURIComponent(technology)}`
-  );
-  if (!res.ok) throw new Error(`Recent searches error: ${res.statusText}`);
-  return res.json();
+  const capped = Math.min(Math.max(limit, 1), 20);
+  try {
+    const res = await fetch(
+      `${API_BASE}/recent-searches?limit=${capped}&technology=${encodeURIComponent(technology)}`
+    );
+    if (res.ok) {
+      return res.json();
+    }
+    if (res.status === 404 || res.status === 405 || res.status === 500) {
+      const runs = await fetchRuns(80, technology);
+      return buildRecentSearchesFromRuns(runs, technology, capped);
+    }
+    throw new Error(`Recent searches error: ${res.statusText}`);
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('Recent searches error')) {
+      throw err;
+    }
+    const runs = await fetchRuns(80, technology);
+    return buildRecentSearchesFromRuns(runs, technology, capped);
+  }
 }
 
 export async function startRun(

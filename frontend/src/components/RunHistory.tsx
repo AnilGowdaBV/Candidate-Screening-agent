@@ -142,10 +142,8 @@ export const RunHistory: React.FC<RunHistoryProps> = ({ technology }) => {
     setLoading(true);
     setError(null);
     try {
-      const [data, runs] = await Promise.all([
-        fetchRecentSearches(20, technology),
-        fetchRuns(40, technology),
-      ]);
+      const runs = await fetchRuns(80, technology);
+      const data = await fetchRecentSearches(20, technology);
       const enriched = enrichComparisonRows(data, runs);
       const seen = new Set<string>();
       const unique: RecentSearchSummary[] = [];
@@ -161,7 +159,9 @@ export const RunHistory: React.FC<RunHistoryProps> = ({ technology }) => {
       setRows(unique);
     } catch (err) {
       console.error('Failed to load recent searches:', err);
-      setError('Could not load searches. Restart the backend (port 8000) and click Refresh.');
+      setError(
+        'Could not load searches. Check VITE_API_URL points to Render and redeploy backend + frontend from latest main.'
+      );
       setRows([]);
     } finally {
       setLoading(false);
