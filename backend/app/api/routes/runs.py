@@ -6,27 +6,33 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.repositories.screening_repo import ScreeningRepository
-from app.schemas.screening import ScreeningRunRead, DashboardMetrics
+from app.schemas.screening import ScreeningRunRead, DashboardMetrics, RecentSearchSummary
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
 
 @router.get("/runs", response_model=List[ScreeningRunRead])
-def list_runs(limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
+def list_runs(
+    limit: int = Query(20, ge=1, le=100),
+    technology: str = Query("golang"),
+    db: Session = Depends(get_db),
+):
     """Retrieve history of screening runs."""
     repo = ScreeningRepository(db)
     runs = repo.list_runs(limit=limit)
     return [ScreeningRunRead.model_validate(r) for r in runs]
 
 
-@router.get("/runs/{run_id}", response_model=ScreeningRunRead)
-def get_run(run_id: int, db: Session = Depends(get_db)):
-    """Fetch run details by ID."""
-    repo = ScreeningRepository(db)
-    run = repo.get_run(run_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return ScreeningRunRead.model_validate(run)
+@router.get("/recent-searches", response_model=List[RecentSearchSummary])
+def recent_searches(
+    limit: int = Query(5, ge=1, le=20),
+    technology: str = Query("golang"),
+    db: Session = Depends(get_db),
+):
+    """Last N runs with tech, short Instahyre label, and Google Sheet tab link."""
+    from app.services.run_sheet_links import run_search_summaries
+
+    return run_search_summaries(db, limit=limit)
 
 
 @router.get("/technology-counts")
@@ -108,6 +114,79 @@ class StartRunRequest(BaseModel):
     technology: Optional[str] = "golang"
     search_url: Optional[str] = None
     limit: Optional[int] = None
+    diff_exclude_run_id: Optional[int] = None
+    diff_exclude_run_ids: Optional[List[int]] = None
+    baseline_url: Optional[str] = None
+    comparison_urls: Optional[List[str]] = None
+
+
+class ComparisonUrlSlot(BaseModel):
+    index: int
+    url: str
+    run_id: Optional[int] = None
+    status: Optional[str] = None
+    in_db: bool = False
+    role: str = "reference"
+
+
+class ComparisonResolveRequest(BaseModel):
+    technology: Optional[str] = "golang"
+    urls: Optional[List[str]] = None
+    baseline_url: Optional[str] = None
+    new_url: Optional[str] = None
+
+
+class ComparisonResolveResponse(BaseModel):
+    ready: bool
+    message: str
+    baseline_run_id: Optional[int] = None
+    baseline_status: Optional[str] = None
+    new_existing_run_id: Optional[int] = None
+    baseline_sheet_tab: Optional[str] = None
+    baseline_sheet_url: Optional[str] = None
+    exclude_run_ids: Optional[List[int]] = None
+    url_slots: Optional[List[ComparisonUrlSlot]] = None
+    target_url_index: Optional[int] = None
+    target_existing_run_id: Optional[int] = None
+
+
+def _comparison_url_list(payload: ComparisonResolveRequest) -> List[str]:
+    if payload.urls:
+        return [u.strip() for u in payload.urls if u and u.strip().startswith("http")]
+    if payload.baseline_url and payload.new_url:
+        return [payload.baseline_url.strip(), payload.new_url.strip()]
+    return []
+
+
+@router.post("/resolve-comparison", response_model=ComparisonResolveResponse)
+@router.post("/runs/resolve-comparison", response_model=ComparisonResolveResponse)
+def resolve_comparison(payload: ComparisonResolveRequest):
+    """Check which comparison URLs are in DB and whether target can diff."""
+    from app.services.run_sheet_links import plan_multi_comparison
+
+    tech = (payload.technology or "golang").lower()
+    urls = _comparison_url_list(payload)
+    if len(urls) < 2:
+        return ComparisonResolveResponse(
+            ready=False,
+            message="Add at least 2 links (references first, target last).",
+        )
+    db = get_sessionmaker_for_tech(tech)()
+    try:
+        plan = plan_multi_comparison(db, urls)
+        slots = [ComparisonUrlSlot.model_validate(s) for s in plan.get("url_slots") or []]
+        return ComparisonResolveResponse(
+            ready=bool(plan.get("ready")),
+            message=str(plan.get("message") or ""),
+            baseline_run_id=plan.get("baseline_run_id"),
+            new_existing_run_id=plan.get("target_existing_run_id"),
+            exclude_run_ids=plan.get("exclude_run_ids"),
+            url_slots=slots or None,
+            target_url_index=plan.get("target_url_index"),
+            target_existing_run_id=plan.get("target_existing_run_id"),
+        )
+    finally:
+        db.close()
 
 
 @router.post("/runs/start", response_model=ActionResponse)
@@ -136,19 +215,66 @@ async def start_screening(payload: Optional[StartRunRequest] = None):
 
     sm = get_sessionmaker_for_tech(tech)
     db = sm()
+    diff_exclude_run_id = payload.diff_exclude_run_id if payload else None
+    diff_exclude_run_ids: List[int] = list(payload.diff_exclude_run_ids or []) if payload else []
     try:
+        if payload and payload.comparison_urls:
+            from app.services.run_sheet_links import plan_multi_comparison
+
+            plan = plan_multi_comparison(db, payload.comparison_urls)
+            if not plan.get("ready"):
+                return ActionResponse(
+                    success=False,
+                    message=str(plan.get("message") or "Comparison not ready."),
+                    run_state=state_manager.state,
+                    run_id=None,
+                )
+            diff_exclude_run_ids = list(plan.get("exclude_run_ids") or [])
+            custom_search_url = payload.comparison_urls[-1].strip()
+        elif payload and payload.baseline_url and payload.baseline_url.strip().startswith("http"):
+            from app.services.run_sheet_links import find_baseline_run_for_url
+
+            baseline = find_baseline_run_for_url(db, payload.baseline_url.strip())
+            if not baseline:
+                return ActionResponse(
+                    success=False,
+                    message="Comparison baseline URL not found in DB. Run the first URL with Start, then try again.",
+                    run_state=state_manager.state,
+                    run_id=None,
+                )
+            diff_exclude_run_id = baseline.id
+            if baseline.id not in diff_exclude_run_ids:
+                diff_exclude_run_ids.append(baseline.id)
+        if diff_exclude_run_id and diff_exclude_run_id not in diff_exclude_run_ids:
+            diff_exclude_run_ids.append(diff_exclude_run_id)
         repo = ScreeningRepository(db)
         config_snapshot = settings.get_safe_status()
         config_snapshot["technology"] = tech
         if custom_search_url:
             config_snapshot["instahyre_search_url"] = custom_search_url
+        if diff_exclude_run_ids:
+            config_snapshot["diff_exclude_run_ids"] = diff_exclude_run_ids
+            config_snapshot["diff_exclude_run_id"] = diff_exclude_run_ids[0]
+        elif diff_exclude_run_id:
+            config_snapshot["diff_exclude_run_id"] = diff_exclude_run_id
+        if payload and payload.comparison_urls:
+            config_snapshot["comparison_urls"] = payload.comparison_urls
+            config_snapshot["comparison_mode"] = True
+        elif payload and payload.baseline_url:
+            config_snapshot["comparison_baseline_url"] = payload.baseline_url.strip()
+            config_snapshot["comparison_mode"] = True
         run = repo.create_run(configuration_snapshot=json.dumps(config_snapshot))
         run_id = run.id
         state_manager.start_run(run_id=run_id, technology=tech)
+        msg = f"Screening Run #{run_id} started for {tech.upper()}"
+        if diff_exclude_run_ids:
+            msg += f" (diff vs runs {', '.join(f'#{r}' for r in diff_exclude_run_ids)})"
+        elif diff_exclude_run_id:
+            msg += f" (diff vs run #{diff_exclude_run_id})"
         repo.record_activity_event(
             run_id=run_id,
             event_type="RUN_STARTED",
-            message=f"Screening Run #{run_id} started for {tech.upper()}",
+            message=msg,
         )
     finally:
         db.close()
@@ -247,3 +373,13 @@ def stop_screening(db: Session = Depends(get_db)):
         run_state=state_manager.state,
         run_id=state_manager.active_run_id,
     )
+
+
+@router.get("/runs/{run_id}", response_model=ScreeningRunRead)
+def get_run(run_id: int, db: Session = Depends(get_db)):
+    """Fetch run details by ID."""
+    repo = ScreeningRepository(db)
+    run = repo.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return ScreeningRunRead.model_validate(run)

@@ -3,8 +3,11 @@ import {
   DashboardMetrics,
   CandidateListResponse,
   ScreeningRun,
+  RecentSearchSummary,
   ActivityEvent,
+  ComparisonResolveResult,
 } from '../types';
+import { buildMultiComparisonPlan } from '../utils/comparisonPlan';
 
 const configuredApi = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
 export const API_BASE = configuredApi ? `${configuredApi}/api` : "/api";
@@ -63,9 +66,18 @@ export async function fetchRuns(limit = 20, technology = 'golang'): Promise<Scre
   return res.json();
 }
 
+export async function fetchRecentSearches(limit = 5, technology = 'golang'): Promise<RecentSearchSummary[]> {
+  const res = await fetch(
+    `${API_BASE}/recent-searches?limit=${limit}&technology=${encodeURIComponent(technology)}`
+  );
+  if (!res.ok) throw new Error(`Recent searches error: ${res.statusText}`);
+  return res.json();
+}
+
 export async function startRun(
   technology = 'golang',
-  searchUrl?: string
+  searchUrl?: string,
+  options?: { baselineUrl?: string; diffExcludeRunId?: number }
 ): Promise<{ success: boolean; message: string }> {
   const res = await fetch(`${API_BASE}/runs/start`, {
     method: 'POST',
@@ -73,6 +85,59 @@ export async function startRun(
     body: JSON.stringify({
       technology,
       search_url: searchUrl && searchUrl.trim() ? searchUrl.trim() : null,
+      baseline_url:
+        options?.baselineUrl && options.baselineUrl.trim()
+          ? options.baselineUrl.trim()
+          : null,
+      diff_exclude_run_id: options?.diffExcludeRunId ?? null,
+    }),
+  });
+  return res.json();
+}
+
+export async function resolveComparison(
+  technology: string,
+  urls: string[]
+): Promise<ComparisonResolveResult> {
+  const res = await fetch(`${API_BASE}/resolve-comparison`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ technology, urls }),
+  });
+  if (res.ok) {
+    return res.json();
+  }
+  if (res.status === 404 || res.status === 405) {
+    const runs = await fetchRuns(60, technology);
+    const local = buildMultiComparisonPlan(runs, urls);
+    if (local.ready) {
+      local.message += ' (checked locally — restart start_agent.bat when convenient.)';
+    }
+    return local;
+  }
+  throw new Error(`Resolve comparison failed: ${res.statusText}`);
+}
+
+export async function startComparisonRun(
+  technology: string,
+  urls: string[]
+): Promise<{ success: boolean; message: string }> {
+  const cleaned = urls.map((u) => u.trim()).filter((u) => u.startsWith('http'));
+  if (cleaned.length < 2) {
+    return { success: false, message: 'Add at least 2 links.' };
+  }
+  const plan = await resolveComparison(technology, cleaned);
+  if (!plan.ready) {
+    return { success: false, message: plan.message };
+  }
+  const res = await fetch(`${API_BASE}/runs/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      technology,
+      search_url: cleaned[cleaned.length - 1],
+      comparison_urls: cleaned,
+      diff_exclude_run_ids: plan.exclude_run_ids ?? [],
     }),
   });
   return res.json();

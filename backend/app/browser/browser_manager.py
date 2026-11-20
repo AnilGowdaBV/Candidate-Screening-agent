@@ -248,6 +248,10 @@ class PlaywrightBrowserManager:
             return False, "Redirected to login page. Authentication required."
 
         await self.ensure_search_job_selected()
+        try:
+            await self.page.wait_for_selector(SEARCH_SELECTORS["candidate_cards"], timeout=20000)
+        except Exception:
+            logger.warning("Search page loaded but candidate cards were not visible yet.")
 
         return True, "Search page loaded successfully"
 
@@ -595,6 +599,8 @@ class PlaywrightBrowserManager:
                         modal_opened = True
             except Exception as click_err:
                 logger.warning("Error clicking candidate card: %s", click_err)
+        if modal_opened:
+            await asyncio.sleep(2)
 
         # Fallback to direct navigation only if modal did not open from card
         if not modal_opened and profile_url and profile_url != self.page.url:

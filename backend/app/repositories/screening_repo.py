@@ -35,6 +35,33 @@ class ScreeningRepository:
         """Fetch run by ID."""
         return self.db.get(ScreeningRun, run_id)
 
+    def candidate_walked_in_run(self, run_id: int, candidate_id: int) -> bool:
+        """True if candidate was opened or duplicate-skipped on this run (walk order)."""
+        stmt = (
+            select(ActivityEvent.id)
+            .where(
+                ActivityEvent.run_id == run_id,
+                ActivityEvent.candidate_id == candidate_id,
+                ActivityEvent.event_type.in_(("CANDIDATE_OPENED", "CANDIDATE_SKIPPED_DUPLICATE")),
+            )
+            .limit(1)
+        )
+        return self.db.execute(stmt).scalar_one_or_none() is not None
+
+    def candidate_walked_in_any_run(self, run_ids: List[int], candidate_id: int) -> bool:
+        if not run_ids:
+            return False
+        stmt = (
+            select(ActivityEvent.id)
+            .where(
+                ActivityEvent.run_id.in_(run_ids),
+                ActivityEvent.candidate_id == candidate_id,
+                ActivityEvent.event_type.in_(("CANDIDATE_OPENED", "CANDIDATE_SKIPPED_DUPLICATE")),
+            )
+            .limit(1)
+        )
+        return self.db.execute(stmt).scalar_one_or_none() is not None
+
     def list_runs(self, limit: int = 20) -> List[ScreeningRun]:
         """List past runs ordered by start time."""
         stmt = select(ScreeningRun).order_by(ScreeningRun.started_at.desc()).limit(limit)

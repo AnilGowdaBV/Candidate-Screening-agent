@@ -70,6 +70,28 @@ class ScreeningOrchestrator:
             cand_repo = CandidateRepository(db)
             screen_repo = ScreeningRepository(db)
 
+            diff_exclude_run_id: Optional[int] = None
+            diff_exclude_run_ids: List[int] = []
+            run_record = screen_repo.get_run(run_id)
+            if run_record and run_record.configuration_snapshot:
+                try:
+                    run_cfg = json.loads(run_record.configuration_snapshot)
+                    raw_list = run_cfg.get("diff_exclude_run_ids")
+                    if isinstance(raw_list, list):
+                        for item in raw_list:
+                            try:
+                                diff_exclude_run_ids.append(int(item))
+                            except (TypeError, ValueError):
+                                continue
+                    raw_diff = run_cfg.get("diff_exclude_run_id")
+                    if raw_diff is not None:
+                        rid = int(raw_diff)
+                        diff_exclude_run_id = rid
+                        if rid not in diff_exclude_run_ids:
+                            diff_exclude_run_ids.append(rid)
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+
             # Determine search URL (custom user URL or default from settings)
             target_search_url = search_url.strip() if search_url and search_url.strip() else settings.INSTAHYRE_SEARCH_URL
 
@@ -226,24 +248,85 @@ class ScreeningOrchestrator:
                     location=card.get("location"),
                     experience=card.get("experience"),
                 )
+                from app.core.cache import cache_invalidate_prefix
+                cache_invalidate_prefix("candidates", tech)
 
                 if card.get("location") and not candidate.location:
                     cand_repo.update_location(candidate.id, card.get("location"))
                 if card.get("experience") and not candidate.experience:
                     cand_repo.update_experience(candidate.id, card.get("experience"))
 
-                # Skip candidate if already screened previously across any run
-                prior_result = screen_repo.find_latest_screening_result(candidate.id)
-                if prior_result and prior_result.run_id != run_id and prior_result.go_status not in ("CHECK_INCOMPLETE", "API_RATE_LIMITED", "API_ERROR"):
-                    logger.info(
-                        "Candidate %s (#%d) already screened previously (%s). Skipping duplicate.",
-                        cand_name, candidate.id, prior_result.go_status,
-                    )
-                    await event_broker.emit(
-                        event_type="CANDIDATE_SKIPPED_DUPLICATE",
-                        message=f"{cand_name} was already screened earlier ({prior_result.go_status}). Skipping duplicate.",
+                skip_profile_open = False
+                on_base_search = False
+                if diff_exclude_run_ids and screen_repo.candidate_walked_in_any_run(
+                    diff_exclude_run_ids, candidate.id
+                ):
+                    on_base_search = True
+                    skip_profile_open = True
+                elif diff_exclude_run_id and screen_repo.candidate_walked_in_run(
+                    diff_exclude_run_id, candidate.id
+                ):
+                    on_base_search = True
+                    skip_profile_open = True
+                elif not diff_exclude_run_id and not diff_exclude_run_ids:
+                    prior_result = screen_repo.find_latest_screening_result(candidate.id)
+                    if prior_result and prior_result.run_id != run_id and prior_result.go_status not in (
+                        "CHECK_INCOMPLETE",
+                        "API_RATE_LIMITED",
+                        "API_ERROR",
+                    ):
+                        skip_profile_open = True
+                        is_positive = (
+                            prior_result.go_status.endswith("_DETECTED")
+                            and "NOT_DETECTED" not in prior_result.go_status
+                        )
+                        if is_positive:
+                            screen_repo.record_screening_result(
+                                candidate_id=candidate.id,
+                                run_id=run_id,
+                                github_status=prior_result.github_status,
+                                go_status=prior_result.go_status,
+                                evidence_summary=prior_result.evidence_summary,
+                                repositories_checked=prior_result.repositories_checked or 0,
+                                languages_found=prior_result.languages_found,
+                                search_order=idx + 1,
+                            )
+                        logger.info(
+                            "Candidate %s (#%d) already screened (%s). Skipping profile open.",
+                            cand_name,
+                            candidate.id,
+                            prior_result.go_status,
+                        )
+                        await event_broker.emit(
+                            event_type="CANDIDATE_SKIPPED_DUPLICATE",
+                            message=f"{cand_name} was already screened earlier ({prior_result.go_status}). Skipping duplicate.",
+                            run_id=run_id,
+                            candidate_id=candidate.id,
+                        )
+                if skip_profile_open:
+                    if on_base_search:
+                        ref_label = (
+                            ",".join(f"#{r}" for r in diff_exclude_run_ids)
+                            if diff_exclude_run_ids
+                            else f"#{diff_exclude_run_id}"
+                        )
+                        logger.info(
+                            "Candidate %s (#%d) already on reference run(s) %s — skipping.",
+                            cand_name,
+                            candidate.id,
+                            ref_label,
+                        )
+                        await event_broker.emit(
+                            event_type="CANDIDATE_SKIPPED_DUPLICATE",
+                            message=f"{cand_name} already screened in earlier list(s) ({ref_label}). Skipping.",
+                            run_id=run_id,
+                            candidate_id=candidate.id,
+                        )
+                    screen_repo.update_run_status(
                         run_id=run_id,
-                        candidate_id=candidate.id,
+                        status="RUNNING",
+                        last_checkpoint=f"candidate_id_{candidate.id}_idx_{idx + 1}",
+                        processed_increment=1,
                     )
                     idx += 1
                     continue

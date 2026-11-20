@@ -144,13 +144,15 @@ def calculate_qa_git_score(user_data: dict, repos: list, languages_found: str = 
     elif followers >= 1:
         score += 0.05
 
-    # 8. Strict Quality Guardrails:
+    # 8. Quality guardrails (caps top score when GitHub traction is low, but keep spread from 1–7)
     if impact == 0 and orig_count <= 2:
-        score = min(score, 3.85)
-    elif impact <= 1:
-        score = min(score, 4.45)
+        score = min(score, 3.95)
+    elif impact == 0:
+        score = min(score, 5.45)
+    elif impact == 1:
+        score = min(score, 5.75)
     elif impact <= 3:
-        score = min(score, 5.30)
+        score = min(score, 6.35)
 
     return round(min(8.00, max(3.10, score)), 2)
 

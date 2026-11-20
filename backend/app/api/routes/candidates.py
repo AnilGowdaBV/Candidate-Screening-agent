@@ -65,6 +65,74 @@ def get_candidate(candidate_id: int, db: Session = Depends(get_db)):
     return CandidateRead.model_validate(cand)
 
 
+@router.post("/{candidate_id}/git-score")
+async def score_candidate_github(
+    candidate_id: int,
+    technology: str = Query("golang", description="Technology used for repo inspection (java, golang, ...)"),
+    persist: bool = Query(
+        True,
+        description="If true, save engine GitScore on the candidate as gitroll_rating (same as screening)",
+    ),
+    github_url: Optional[str] = Query(
+        None,
+        description="Optional override; defaults to candidate's stored GitHub URL",
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the screening engine's GitScore (GitHub REST analysis + calculate_qa_git_score).
+    This is NOT GitRoll.io — use /gitroll-scan for that.
+    """
+    from app.core.cache import cache_invalidate_prefix
+    from app.database.session import _canonical_tech
+    from app.repositories.candidate_repo import CandidateRepository
+    from app.services.github_service import GitHubService
+
+    repo = CandidateRepository(db)
+    cand = repo.get_by_id(candidate_id)
+    if not cand:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    target_url = (github_url or "").strip() or cand.github_url
+    if not target_url:
+        raise HTTPException(
+            status_code=400,
+            detail="No GitHub URL on candidate; pass github_url query param to test",
+        )
+
+    tech = _canonical_tech(technology)
+    gh = GitHubService()
+    result = await gh.verify_candidate(target_url, technology=tech)
+
+    stored_rating = cand.gitroll_rating
+    if persist and result.git_score is not None:
+        updated = repo.update_gitroll_score(candidate_id, result.git_score)
+        if result.languages_found:
+            repo.update_languages_found(candidate_id, result.languages_found)
+        cache_invalidate_prefix("candidates", tech)
+        if updated:
+            stored_rating = updated.gitroll_rating
+
+    return {
+        "success": result.status not in ("API_ERROR", "API_RATE_LIMITED", "CHECK_INCOMPLETE"),
+        "candidate_id": cand.id,
+        "candidate_name": cand.name,
+        "technology": tech,
+        "github_url": target_url,
+        "github_username": result.username,
+        "git_score": result.git_score,
+        "git_score_scale": "0-10",
+        "detection_status": result.status,
+        "evidence_summary": result.evidence_summary,
+        "languages_found": result.languages_found,
+        "repositories_checked": result.repositories_checked,
+        "error_code": result.error_code,
+        "error_message": result.error_message,
+        "persisted": bool(persist and result.git_score is not None),
+        "stored_gitroll_rating": stored_rating,
+    }
+
+
 @router.post("/{candidate_id}/gitroll-scan")
 async def scan_candidate_gitroll(
     candidate_id: int,

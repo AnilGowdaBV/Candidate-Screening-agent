@@ -65,6 +65,8 @@ interface CandidateExplorerProps {
   selectedTechnology?: TechnologyKey;
   pageSize?: number;
   onPageSizeChange?: (size: number) => void;
+  activeCandidateName?: string | null;
+  activeCandidateId?: number | null;
 }
 
 export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
@@ -78,6 +80,8 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
   selectedTechnology = 'golang',
   pageSize = 500,
   onPageSizeChange,
+  activeCandidateName = null,
+  activeCandidateId = null,
 }) => {
   const currentTech = TECHNOLOGIES.find((t) => t.key === selectedTechnology) || TECHNOLOGIES[0];
   const currentSheetUrl = TECH_SHEET_MAP[selectedTechnology] || TECH_SHEET_MAP.golang;
@@ -370,6 +374,21 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
       }
     });
   }, [candidates, activeFilter]);
+
+  const displayedCandidates = React.useMemo(() => {
+    const list = [...filteredCandidates];
+    if (!activeCandidateId && !activeCandidateName) return list;
+    const idx = list.findIndex((cand) =>
+      activeCandidateName
+        ? cand.name?.toLowerCase() === activeCandidateName.toLowerCase()
+        : activeCandidateId != null && cand.id === activeCandidateId,
+    );
+    if (idx > 0) {
+      const [current] = list.splice(idx, 1);
+      list.unshift(current);
+    }
+    return list;
+  }, [filteredCandidates, activeCandidateId, activeCandidateName]);
 
   return (
     <div className="agent-card" style={{ position: 'relative' }}>
@@ -680,14 +699,14 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
             </tr>
           </thead>
           <tbody>
-            {filteredCandidates.length === 0 ? (
+            {displayedCandidates.length === 0 ? (
               <tr>
                 <td colSpan={11} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-dim)' }}>
                   No candidate records match the active criteria in {currentTech.dbFileName}.
                 </td>
               </tr>
             ) : (
-              filteredCandidates.map((cand) => {
+              displayedCandidates.map((cand) => {
                 const latestResult = cand.screening_results?.[cand.screening_results.length - 1];
                 // const latestNote = cand.note_actions?.[cand.note_actions.length - 1];
                 // const checkedTime = cand.last_seen_at
@@ -695,7 +714,16 @@ export const CandidateExplorer: React.FC<CandidateExplorerProps> = ({
                 //   : '—';
                 const isDetected = Boolean(latestResult?.go_status && latestResult.go_status.endsWith('_DETECTED') && !latestResult.go_status.includes('NOT'));
                 const decision = getDecision(cand);
-                const rowClass = decision === 'SELECTED' ? 'row-selected' : decision === 'REJECTED' ? 'row-rejected' : '';
+                const isScreeningNow = activeCandidateName
+                  ? cand.name?.toLowerCase() === activeCandidateName.toLowerCase()
+                  : activeCandidateId != null && cand.id === activeCandidateId;
+                const rowClass = isScreeningNow
+                  ? 'row-screening'
+                  : decision === 'SELECTED'
+                    ? 'row-selected'
+                    : decision === 'REJECTED'
+                      ? 'row-rejected'
+                      : '';
 
                 return (
                   <tr key={cand.id} className={rowClass}>

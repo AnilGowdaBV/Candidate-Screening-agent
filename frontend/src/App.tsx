@@ -5,18 +5,15 @@ import { ControlPanel } from './components/ControlPanel';
 import { CurrentOperationCard } from './components/CurrentOperationCard';
 import { WorkflowTracker } from './components/WorkflowTracker';
 import { MetricsCards } from './components/MetricsCards';
-import { ActivityTimeline } from './components/ActivityTimeline';
+// import { ActivityTimeline } from './components/ActivityTimeline';
 import { CandidateExplorer } from './components/CandidateExplorer';
 import { RunHistory } from './components/RunHistory';
-
 import {
   fetchStatus,
   fetchMetrics,
   fetchTechnologyCounts,
   fetchEvents,
   fetchCandidates,
-  fetchRuns,
-  startRun,
   pauseRun,
   resumeRun,
   stopRun,
@@ -28,7 +25,6 @@ import {
   DashboardMetrics,
   ActivityEvent,
   Candidate,
-  ScreeningRun,
   TechnologyKey,
 } from './types';
 
@@ -38,11 +34,9 @@ export const App: React.FC = () => {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [candidateTotal, setCandidateTotal] = useState(0);
-  const [runs, setRuns] = useState<ScreeningRun[]>([]);
 
   // Multi-Technology State
   const [selectedTechnology, setSelectedTechnology] = useState<TechnologyKey>('java');
-  const [searchUrl, setSearchUrl] = useState<string>('');
   const [techCounts, setTechCounts] = useState<Record<TechnologyKey, number>>({
     golang: 0,
     python: 0,
@@ -100,15 +94,6 @@ export const App: React.FC = () => {
     }
   }, [search, activeFilter, pageSize, selectedTechnology]);
 
-  // Load runs for selected technology (last 5 runs)
-  const refreshRuns = useCallback(async () => {
-    try {
-      const data = await fetchRuns(5, selectedTechnology);
-      setRuns(data);
-    } catch (err) {
-      console.error('Failed to refresh runs:', err);
-    }
-  }, [selectedTechnology]);
 
   useEffect(() => {
     const cachedMetrics = metricsCache.current[selectedTechnology];
@@ -124,9 +109,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     refreshCore();
     refreshCandidates();
-    refreshRuns();
     refreshAllCounts();
-  }, [refreshCore, refreshCandidates, refreshRuns, refreshAllCounts]);
+  }, [refreshCore, refreshCandidates, refreshAllCounts]);
 
   // Connect to live SSE stream for real-time activity events
   useEffect(() => {
@@ -156,34 +140,19 @@ export const App: React.FC = () => {
     };
   }, [refreshCore, refreshCandidates, refreshAllCounts]);
 
-  // Fallback poll interval (every 4s)
+  const isRunActive = status?.run_state === 'RUNNING' || status?.run_state === 'VALIDATING';
   useEffect(() => {
     const timer = setInterval(() => {
       refreshCore();
       refreshCandidates();
       refreshAllCounts();
-    }, 20000);
+    }, isRunActive ? 4000 : 20000);
     return () => clearInterval(timer);
-  }, [refreshCore, refreshCandidates, refreshAllCounts]);
+  }, [isRunActive, refreshCore, refreshCandidates, refreshAllCounts]);
 
-  // Actions
-  const handleStart = async () => {
-    if (!searchUrl || !searchUrl.trim().startsWith('http')) {
-      alert(`Instahyre Search URL is required. Please paste your filtered Instahyre search URL before starting.`);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const res = await startRun(selectedTechnology, searchUrl.trim());
-      if (!res.success) alert(res.message);
-      await refreshCore();
-      await refreshRuns();
-      await refreshAllCounts();
-    } catch (err) {
-      alert('Error starting run: ' + String(err));
-    } finally {
-      setIsLoading(false);
-    }
+  const handleRunStarted = async () => {
+    await refreshCore();
+    await refreshAllCounts();
   };
 
   const handlePause = async () => {
@@ -218,15 +187,12 @@ export const App: React.FC = () => {
       const res = await stopRun();
       if (!res.success) alert(res.message);
       await refreshCore();
-      await refreshRuns();
     } catch (err) {
       alert('Error stopping run: ' + String(err));
     } finally {
       setIsLoading(false);
     }
   };
-
-  const isRunActive = status?.run_state === 'RUNNING' || status?.run_state === 'VALIDATING';
 
   return (
     <div className="app-container">
@@ -240,18 +206,15 @@ export const App: React.FC = () => {
         candidateCounts={techCounts}
       />
 
-      {/* 3. Configuration, Skill Target Dropdown & URL Input Controls */}
       <ControlPanel
         status={status}
         selectedTechnology={selectedTechnology}
         onSelectTechnology={setSelectedTechnology}
-        searchUrl={searchUrl}
-        onSearchUrlChange={setSearchUrl}
-        onStart={handleStart}
         onPause={handlePause}
         onResume={handleResume}
         onStop={handleStop}
         isLoading={isLoading}
+        onRunStarted={handleRunStarted}
       />
 
       {/* 4. Live Operation & Workflow Stage */}
@@ -286,13 +249,19 @@ export const App: React.FC = () => {
         selectedTechnology={selectedTechnology}
         pageSize={pageSize}
         onPageSizeChange={setPageSize}
+        activeCandidateName={isRunActive ? status?.current_operation?.candidate_reference : null}
+        activeCandidateId={
+          isRunActive
+            ? [...events].reverse().find((event) => event.candidate_id)?.candidate_id ?? null
+            : null
+        }
       />
 
-      {/* 7. Live Activity Timeline */}
-      <ActivityTimeline events={events} />
+      {/* 7. Live Activity Timeline — hidden for now (re-enable when ready) */}
+      {/* <ActivityTimeline events={events} /> */}
 
       {/* 8. Run History */}
-      <RunHistory runs={runs} onRefresh={refreshRuns} />
+      <RunHistory technology={selectedTechnology} />
     </div>
   );
 };

@@ -4,11 +4,12 @@ import asyncio
 import json
 import threading
 from typing import Dict, Any, Optional, List, Tuple
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from app.database.session import get_sessionmaker_for_tech
 from app.models.candidate import Candidate
 from app.models.screening_result import ScreeningResult
 from app.models.screening_run import ScreeningRun
+from app.models.activity_event import ActivityEvent
 from playwright.async_api import async_playwright
 from app.core.logging import get_logger
 
@@ -121,7 +122,7 @@ def _build_tsv_for_rows(rows, tech_name: str) -> str:
     return "\n".join(lines)
 
 
-def resolve_one_url_one_sheet_target(db) -> Tuple[str, List[int], str]:
+def resolve_one_url_one_sheet_target(db) -> Tuple[str, List[int], str, int]:
     """
     Enforces the "One URL = One Sheet" ideology across all technologies:
     1. Collects all historical runs in chronological order.
@@ -130,7 +131,7 @@ def resolve_one_url_one_sheet_target(db) -> Tuple[str, List[int], str]:
        - 2nd unique URL -> Sheet2
        - N-th unique URL -> SheetN
     3. If a run on the same URL failed or is re-triggered, it reuses the SAME sheet tab!
-    4. Returns: (target_tab_name, associated_run_ids, search_url)
+    4. Returns: (target_tab_name, associated_run_ids, search_url, target_run_id)
     """
     runs = db.execute(select(ScreeningRun).order_by(ScreeningRun.id.asc())).scalars().all()
 
@@ -168,7 +169,7 @@ def resolve_one_url_one_sheet_target(db) -> Tuple[str, List[int], str]:
         "Resolved One-URL-One-Sheet: target_tab='%s', run_ids=%s, url='%s'",
         target_tab, associated_run_ids, target_url[:80] if target_url else "None"
     )
-    return target_tab, associated_run_ids, target_url
+    return target_tab, associated_run_ids, target_url, target_run_id
 
 
 async def _paste_to_tab(page, tab_name: str, tsv_content: str):
@@ -255,29 +256,37 @@ async def export_candidates_to_google_sheet(
 
     try:
         # Resolve target tab and associated runs using the "One URL = One Sheet" ideology
-        target_tab, associated_run_ids, search_url = resolve_one_url_one_sheet_target(db)
+        target_tab, associated_run_ids, search_url, target_run_id = resolve_one_url_one_sheet_target(db)
 
-        # Deduplicate candidate results if same candidate was seen across retries of this URL
-        res_subquery = (
-            select(func.max(ScreeningResult.id))
-            .where(ScreeningResult.run_id.in_(associated_run_ids))
-            .group_by(ScreeningResult.candidate_id)
-        )
+        # Only positives from profiles actually opened in this run (not duplicate-skip copies).
         stmt = (
             select(Candidate, ScreeningResult)
             .join(ScreeningResult, ScreeningResult.candidate_id == Candidate.id)
+            .join(
+                ActivityEvent,
+                and_(
+                    ActivityEvent.run_id == ScreeningResult.run_id,
+                    ActivityEvent.candidate_id == ScreeningResult.candidate_id,
+                    ActivityEvent.event_type == "CANDIDATE_OPENED",
+                ),
+            )
             .where(
-                ScreeningResult.id.in_(res_subquery),
+                ScreeningResult.run_id == target_run_id,
                 ScreeningResult.go_status.like("%_DETECTED"),
                 ~ScreeningResult.go_status.like("%NOT_DETECTED%"),
             )
             .order_by(ScreeningResult.search_order.asc(), Candidate.id.asc())
+            .distinct()
         )
         rows = db.execute(stmt).all()
         total_exported = len(rows)
         logger.info(
-            "Exporting %d candidates for %s to '%s' (Search URL: %s)",
-            total_exported, tech.capitalize(), target_tab, search_url[:80] if search_url else "Default"
+            "Exporting %d new-open positives for %s to '%s' (run_id=%s, Search URL: %s)",
+            total_exported,
+            tech.capitalize(),
+            target_tab,
+            target_run_id,
+            search_url[:80] if search_url else "Default",
         )
 
         tsv_data = _build_tsv_for_rows(rows, tech)

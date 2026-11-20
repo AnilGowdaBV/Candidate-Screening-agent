@@ -114,6 +114,55 @@ export interface CandidateListResponse {
   offset: number;
 }
 
+export interface SearchComparisonSummary {
+  baseline_run_id: number;
+  baseline_search_short: string;
+  baseline_search_url?: string | null;
+  baseline_sheet_tab: string;
+  baseline_sheet_url: string;
+  new_run_id: number;
+  new_search_short: string;
+  new_search_url?: string | null;
+  new_only_sheet_tab: string;
+  new_only_sheet_url: string;
+}
+
+export interface RecentSearchSummary {
+  run_id: number;
+  technology: string;
+  status: string;
+  started_at: string;
+  instahyre_search_short: string;
+  instahyre_search_url?: string | null;
+  google_sheet_tab: string;
+  google_sheet_url: string;
+  is_comparison?: boolean;
+  comparison?: SearchComparisonSummary | null;
+}
+
+export interface ComparisonUrlSlot {
+  index: number;
+  url: string;
+  run_id?: number | null;
+  status?: string | null;
+  in_db: boolean;
+  role: 'reference' | 'target';
+}
+
+export interface ComparisonResolveResult {
+  ready: boolean;
+  message: string;
+  baseline_run_id?: number | null;
+  baseline_status?: string | null;
+  new_existing_run_id?: number | null;
+  target_existing_run_id?: number | null;
+  baseline_sheet_tab?: string | null;
+  baseline_sheet_url?: string | null;
+  exclude_run_ids?: number[] | null;
+  url_slots?: ComparisonUrlSlot[] | null;
+  target_url_index?: number | null;
+}
+
 export interface ScreeningRun {
   id: number;
   status: string;

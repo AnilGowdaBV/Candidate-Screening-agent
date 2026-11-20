@@ -49,6 +49,7 @@ class CandidateRepository:
         if existing:
             # Update last seen and any missing fields safely
             existing.last_seen_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(timezone.utc)
             if not existing.github_url and github_url:
                 existing.github_url = github_url
             if not existing.instahyre_external_id and instahyre_external_id:

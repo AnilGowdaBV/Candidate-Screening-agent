@@ -5,6 +5,32 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict
 
 
+class SearchComparisonSummary(BaseModel):
+    baseline_run_id: int
+    baseline_search_short: str
+    baseline_search_url: Optional[str] = None
+    baseline_sheet_tab: str
+    baseline_sheet_url: str
+    new_run_id: int
+    new_search_short: str
+    new_search_url: Optional[str] = None
+    new_only_sheet_tab: str
+    new_only_sheet_url: str
+
+
+class RecentSearchSummary(BaseModel):
+    run_id: int
+    technology: str
+    status: str
+    started_at: datetime
+    instahyre_search_short: str
+    instahyre_search_url: Optional[str] = None
+    google_sheet_tab: str
+    google_sheet_url: str
+    is_comparison: bool = False
+    comparison: Optional[SearchComparisonSummary] = None
+
+
 class ScreeningRunRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

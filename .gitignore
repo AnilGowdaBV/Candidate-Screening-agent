@@ -39,3 +39,23 @@ backend/.env
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Local ops / exports (keep out of git)
+backend/scratch/
+data/*.tsv
+data/*.count.txt
+data/run*_live_diff.txt
+backend/backend/
+
+# One-off root debug scripts
+/apply_patch_part*.py
+/capture_network.py
+/check_account.py
+/check_download_links.py
+/do_login.py
+/inspect_*.py
+/patch_modal_gh.py
+/scratch_*.py
+/scratch_*.json
+/test_manish_*.py
+/test_search_modal_*.py

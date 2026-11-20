@@ -355,6 +355,12 @@ html, body {
 .data-table tbody tr.row-selected:hover td {
   background: #bbf7d0 !important;
 }
+.data-table tbody tr.row-screening td {
+  background: #dbeafe !important;
+}
+.data-table tbody tr.row-screening:hover td {
+  background: #bfdbfe !important;
+}
 .data-table tbody tr.row-rejected td {
   background: #e5e7eb !important;
 }
