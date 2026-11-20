@@ -95,27 +95,49 @@ export async function startRun(
   return res.json();
 }
 
+async function comparisonPlanFromRuns(
+  technology: string,
+  urls: string[]
+): Promise<ComparisonResolveResult> {
+  const cleaned = urls.map((u) => u.trim()).filter((u) => u.startsWith('http'));
+  const runs = await fetchRuns(80, technology);
+  return buildMultiComparisonPlan(runs, cleaned);
+}
+
 export async function resolveComparison(
   technology: string,
   urls: string[]
 ): Promise<ComparisonResolveResult> {
-  const res = await fetch(`${API_BASE}/resolve-comparison`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ technology, urls }),
-  });
-  if (res.ok) {
-    return res.json();
+  let local: ComparisonResolveResult;
+  try {
+    local = await comparisonPlanFromRuns(technology, urls);
+  } catch {
+    throw new Error(
+      'Could not reach the API. On Vercel, set VITE_API_URL to your Render backend (no trailing slash) and redeploy the frontend.'
+    );
   }
-  if (res.status === 404 || res.status === 405) {
-    const runs = await fetchRuns(60, technology);
-    const local = buildMultiComparisonPlan(runs, urls);
-    if (local.ready) {
-      local.message += ' (checked locally — restart start_agent.bat when convenient.)';
+
+  try {
+    const res = await fetch(`${API_BASE}/resolve-comparison`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ technology, urls }),
+    });
+    if (res.ok) {
+      const server: ComparisonResolveResult = await res.json();
+      if (server.url_slots?.length || server.baseline_sheet_url) {
+        return server;
+      }
+      return server.ready ? server : local;
     }
-    return local;
+  } catch {
+    // POST optional (older Render builds, CORS blips) — run list plan is enough for Check plan
   }
-  throw new Error(`Resolve comparison failed: ${res.statusText}`);
+
+  if (local.ready) {
+    local.message += ' (from run history on API).';
+  }
+  return local;
 }
 
 export async function startComparisonRun(

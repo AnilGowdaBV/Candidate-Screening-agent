@@ -127,7 +127,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       setCompareHint(res.message);
       setCompareReady(res.ready);
     } catch (e) {
-      setCompareHint(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setCompareHint(msg.includes('fetch') ? 'Could not reach API — check VITE_API_URL / Render backend.' : msg);
     } finally {
       setBusy(false);
     }
